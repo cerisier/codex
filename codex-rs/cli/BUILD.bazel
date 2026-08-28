@@ -1,15 +1,44 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
 load("//:defs.bzl", "MACOS_WEBRTC_RUSTC_LINK_FLAGS", "codex_rust_crate")
 load("//bazel/platforms:release_binaries.bzl", "multiplatform_binaries")
 load("//bazel/rules:e2e_benchmark.bzl", "codex_e2e_benchmark")
 
 codex_rust_crate(
     name = "cli",
+    binary_link_deps_extra = {
+        "codex": select({
+            "@llvm//constraints/windows/abi:msvc": [":windows-system-libraries"],
+            "//conditions:default": [],
+        }),
+    },
+    cc_common_link_binaries = ["codex"],
     crate_name = "codex_cli",
     extra_binaries = [
         "//codex-rs/bwrap:bwrap",
     ],
     rustc_flags_extra = MACOS_WEBRTC_RUSTC_LINK_FLAGS,
     test_data_extra = glob(["src/**/snapshots/**"]),
+)
+
+# rustc normally discovers these transitive #[link] requirements while it owns
+# the final link. Model them as CcInfo when rules_rust delegates that link to
+# cc_common instead.
+cc_library(
+    name = "windows-system-libraries",
+    linkopts = [
+        "fwpuclnt.lib",
+        "gdi32.lib",
+        "iphlpapi.lib",
+        "netapi32.lib",
+        "ntdll.lib",
+        "psapi.lib",
+        "user32.lib",
+        "winhttp.lib",
+    ],
+    target_compatible_with = [
+        "@platforms//os:windows",
+        "@llvm//constraints/windows/abi:msvc",
+    ],
 )
 
 multiplatform_binaries(

@@ -1,0 +1,32 @@
+diff --git a/BUILD.bazel b/BUILD.bazel
+--- a/BUILD.bazel
++++ b/BUILD.bazel
+@@ -27,6 +27,7 @@ BORINGSSL_COPTS = PLATFORM_COPTS + select({
+ })
+ 
+ BORINGSSL_CONLYOPTS = select({
++    ":is_windows_clang_cl": ["/std:c11"],
+     "@rules_cc//cc/compiler:msvc-cl": ["/std:c11"],
+     "//conditions:default": ["-std=c11"],
+ })
+@@ -191,6 +192,7 @@ COMMON_COPTS = ["-DBORINGSSL_IMPLEMENTATION"] + select({
+ })
+ 
+ TEST_COPTS = COMMON_COPTS + select({
++    ":is_windows_clang_cl": [],
+     "@rules_cc//cc/compiler:msvc-cl": [],
+     "//conditions:default": [
+         "-Wno-deprecated-declarations",
+@@ -211,6 +213,12 @@ cc_library(
+     hdrs = glob(["third_party/jitterentropy/jitterentropy-library/**/*.h"]),
+     conlyopts = BORINGSSL_CONLYOPTS,
+     copts = select({
++        ":is_windows_clang_cl": [
++            "/Od",
++            "/W4",
++            "/DYNAMICBASE",
++            "/DAWSLC",
++        ],
+         "@rules_cc//cc/compiler:msvc-cl": [
+             "/Od",
+             "/W4",
