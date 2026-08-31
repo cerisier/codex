@@ -8,16 +8,11 @@ bazel_dep(name = "protobuf", version = "34.0.bcr.1", repo_name = "com_google_pro
 bazel_dep(name = "llvm", version = "0.8.11")
 bazel_dep(name = "windows_support", version = "0.2.0")
 
-# Patch hermetic LLVM for Codex's custom libc++ and Windows gnullvm runtime
-# needs that have not landed upstream.
-single_version_override(
+# Exercise the current hermetic-llvm main branch, including Windows MSVC
+# target support merged from PR #718.
+local_path_override(
     module_name = "llvm",
-    patch_strip = 1,
-    patches = [
-        "//patches:llvm_rusty_v8_custom_libcxx.patch",
-        "//patches:llvm_windows_arm64_powl.patch",
-        "//patches:llvm_windows_mingw_compat.patch",
-    ],
+    path = "/Users/corentinkerisit/code/github.com/hermeticbuild/hermetic-llvm.git",
 )
 
 # Preserve case-only SDK aliases when native Windows repository setup feeds
@@ -145,6 +140,13 @@ single_version_override(
 
 bazel_dep(name = "rules_platform", version = "0.1.0")
 bazel_dep(name = "aws-lc", version = "5.1.0.bcr.1")
+single_version_override(
+    module_name = "aws-lc",
+    patch_strip = 1,
+    patches = ["//patches:aws-lc_windows_clang_cl.patch"],
+    version = "5.1.0.bcr.1",
+)
+
 bazel_dep(name = "rules_rs", version = "0.0.96")
 single_version_override(
     module_name = "rules_rs",
@@ -162,6 +164,9 @@ rules_rust.patch(
         # Carry the OpenAI setup fix that makes build-script tools available
         # through their runfiles after the rules_rs upgrade.
         "//patches:rules_rust_build_script_tools_transition.patch",
+        # rules_rs 0.0.96 pins rules_rust before the upstream clang-cl path
+        # rewrite; retain the merged fix until that snapshot is updated.
+        "//patches:rules_rust_clang_cl_build_script_paths.patch",
         # Prefer Rust's direct linker for Windows/MSVC and keep hermetic
         # LLVM's non-.lib runtime artifacts compatible with it.
         "//patches:rules_rust_windows_msvc_direct_link_args.patch",
@@ -311,6 +316,7 @@ crate.annotation(
     crate = "blake3",
     crate_features_select = {
         "x86_64-pc-windows-gnullvm": ["pure"],
+        "x86_64-pc-windows-msvc": ["pure"],
     },
 )
 crate.annotation(

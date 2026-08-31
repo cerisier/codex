@@ -192,6 +192,8 @@ def codex_rust_crate(
         build_script_data = [],
         compile_data = [],
         binary_compile_data_extra = {},
+        binary_link_deps_extra = {},
+        cc_common_link_binaries = [],
         lib_data_extra = [],
         rustc_flags_extra = [],
         binary_rustc_flags_extra = {},
@@ -235,6 +237,10 @@ def codex_rust_crate(
         compile_data: Non-Rust compile-time data for the library target.
         binary_compile_data_extra: Mapping from binary names to extra non-Rust
             compile-time data for those binary targets.
+        binary_link_deps_extra: Mapping from binary names to native CcInfo
+            dependencies for their final link actions.
+        cc_common_link_binaries: Binary names whose final native link should be
+            materialized with rules_rust's cc_common integration.
         lib_data_extra: Extra runtime data for the library target.
         binary_rustc_flags_extra: Mapping from binary names to extra rustc
             flags for those binary targets.
@@ -401,6 +407,8 @@ def codex_rust_crate(
             # Keep per-binary Cargo link behavior scoped to the matching
             # generated rust_binary instead of leaking it to sibling binaries.
             compile_data = binary_compile_data_extra.get(binary, []),
+            experimental_use_cc_common_link = 1 if binary in cc_common_link_binaries else -1,
+            link_deps = binary_link_deps_extra.get(binary, []),
             rustc_flags = rustc_flags_extra + binary_rustc_flags_extra.get(binary, []) + WINDOWS_RUSTC_LINK_FLAGS,
             # rules_rust substitutes workspace status values only for stamped
             # actions, so pass the existing key through to final binaries.
