@@ -8,12 +8,13 @@ bazel_dep(name = "platforms", version = "1.0.0")
 bazel_dep(name = "protobuf", version = "34.0.bcr.1", repo_name = "com_google_protobuf")
 bazel_dep(name = "llvm", version = "0.8.11")
 bazel_dep(name = "windows_support", version = "0.2.0")
+bazel_dep(name = "with_cfg.bzl", version = "0.12.0")
 
-# Dedicated MSVC integration proof against clean hermetic-llvm main
-# fd2addebff08b29675ee266bc2766e475ce9263b. No toolchain source patches.
+# Dedicated MSVC integration proof. The isolated LLVM branch adds only the
+# compiler-semantic C++ standard-library opt-outs used by V8's private libc++.
 local_path_override(
     module_name = "llvm",
-    path = "../hermetic-llvm-current",
+    path = "../hermetic-llvm-cxx-stdlib",
 )
 
 # Preserve case-only SDK aliases when native Windows repository setup feeds
@@ -340,13 +341,43 @@ rules_rust_bindgen = use_extension(
 )
 use_repo(rules_rust_bindgen, "rules_rust_bindgen")
 
-register_toolchains("@rules_rust_bindgen//:all")
+register_toolchains(
+    "//bazel/toolchains/bindgen:windows_msvc",
+    "@rules_rust_bindgen//:all",
+)
 
 # Generate Rust protobuf/gRPC libraries against the workspace's prost/tonic
 # versions instead of the versions bundled with rules_rs's default toolchain.
 register_toolchains("//bazel/toolchains/prost:toolchain")
 
 crate = use_extension("@rules_rs//rs:extensions.bzl", "crate")
+crate.from_cargo(
+    name = "bindgen_crates",
+    cargo_lock = "@bindgen_source//:Cargo.lock",
+    cargo_toml = "@bindgen_source//:Cargo.toml",
+    platform_triples = [
+        "aarch64-apple-darwin",
+        "aarch64-unknown-linux-gnu",
+        "aarch64-unknown-linux-musl",
+        "x86_64-apple-darwin",
+        "x86_64-unknown-linux-gnu",
+        "x86_64-unknown-linux-musl",
+    ],
+)
+crate.annotation(
+    crate = "bindgen-cli",
+    gen_binaries = ["bindgen"],
+    repositories = ["bindgen_crates"],
+)
+crate.annotation(
+    crate = "clang-sys",
+    crate_features = ["static"],
+    gen_build_script = "off",
+    repositories = ["bindgen_crates"],
+    deps = ["@llvm-project//clang:libclang_static"],
+)
+use_repo(crate, "bindgen_crates")
+
 crate.from_cargo(
     cargo_lock = "//codex-rs:Cargo.lock",
     cargo_toml = "//codex-rs:Cargo.toml",
@@ -543,6 +574,17 @@ crate.annotation(
 )
 
 http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+
+# Keep bindgen's embedded parser aligned with the selected LLVM resource
+# headers, without importing the producer project's toolchain registrations.
+http_archive(
+    name = "bindgen_source",
+    build_file_content = 'exports_files(["Cargo.toml", "Cargo.lock", "empty.rs"])',
+    integrity = "sha256-iu025DMJ/Bk6fleoNRKpGskPQzgkO2qihAXxeEiJdLM=",
+    strip_prefix = "hermeticbuild-bindgen-fd0bacb",
+    type = "tar.gz",
+    urls = ["https://api.github.com/repos/hermeticbuild/bindgen/tarball/fd0bacbabaa61ac06c00b044f78d2272d811ae80"],
+)
 
 codex_release_archive = use_repo_rule("//bazel/extensions:codex_release_archive.bzl", "codex_release_archive")
 
@@ -837,6 +879,7 @@ engine_repository(
         "//patches:v8_source_portability.patch",
         "//patches:v8_array_sort_elements_kind.patch",
         "//third_party/v8:v8_defs.patch",
+        "//third_party/v8:v8_windows_snapshot_wine.patch",
     ],
     strip_prefix = "v8-15.2.124.1",
     urls = ["https://github.com/v8/v8/archive/refs/tags/15.2.124.1.tar.gz"],
@@ -854,17 +897,6 @@ pip.parse(
     ],
 )
 use_repo(pip, "v8_python_deps")
-
-native_windows_llvm = use_repo_rule("//third_party/v8:native_windows.bzl", "native_windows_llvm")
-
-native_windows_llvm(name = "v8_native_windows_llvm")
-
-native_windows_cc = use_repo_rule("//third_party/v8:native_windows.bzl", "native_windows_cc")
-
-native_windows_cc(
-    name = "v8_native_windows_cc",
-    native_llvm = "@v8_native_windows_llvm//:BUILD.bazel",
-)
 
 v8_dependencies = use_extension("//third_party/v8:dependencies.bzl", "dependencies")
 use_repo(

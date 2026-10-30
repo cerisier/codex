@@ -123,8 +123,8 @@ revision must keep the native GNU link/runtime checks passing. The Bazel pair
 targets above point directly to source targets so a new release or canary never
 depends on an older published copy.
 
-Native Windows x64 and ARM64 hosts can build sandbox archives and matching
-Rust bindings with pinned clang-cl and the installed Microsoft SDK using
+Windows x64 and ARM64 sandbox archives and matching Rust bindings use the
+selected hermetic `@llvm` clang-cl toolchain and its declared Microsoft SDK:
 `//third_party/v8:v8_152_2_0_x86_64_pc_windows_msvc_bazel` and
 `//third_party/v8:v8_152_2_0_aarch64_pc_windows_msvc_bazel`.
 The producer selectors `//third_party/v8:rusty_v8_native_windows_archive_for_target`
@@ -142,29 +142,41 @@ bindings use that same threshold; never pair a native 64-byte threshold with
 GN's size-zero binding constant. These are fixed platform choices, not additional
 developer build switches.
 
-Use a native Visual Studio Developer PowerShell with the C++ tools and Windows
-SDK available. The SDK supplies headers, libraries, `dumpbin.exe`, and the
-assembler. From the repo root, build the archive for that host:
+For the Linux remote-execution, static-CRT x64 integration proof:
 
-```powershell
-bazel build --config=ci-windows-msvc `
-  --host_platform=//:local_windows_msvc --platforms=//:local_windows_msvc `
-  //third_party/v8:rusty_v8_native_windows_archive_for_target `
+```sh
+bazel build --config=buildbuddy-generic-rbe --host_platform=//:rbe \
+  --platforms=@llvm//platforms:windows_x86_64_msvc \
+  --extra_execution_platforms=//:rbe,//bazel/platforms:linux_x86_64_rbe \
+  --repo_env=BAZEL_MSVC_RUNTIME_VISUAL_STUDIO_EULA=1 \
+  --repo_env=BAZEL_WINDOWS_SDK_EULA=1 \
+  --features=-dynamic_link_msvcrt --features=static_link_msvcrt \
+  --features=cargo-rebase-json-vfs-overlays \
+  //third_party/v8:rusty_v8_native_windows_archive_for_target \
   //third_party/v8:rusty_v8_native_windows_binding_for_target
 ```
 
-Bazel fetches and verifies LLVM 22.1.8 for the host, the same major and patch
-version as the libclang that generates bindings. The V8 artifact profile selects
-clang-cl, lld-link, llvm-lib and compiler-rt only for its Windows MSVC source
-archive and bindings, together with the installed SDK. Bazel consumers now
-cross this same boundary automatically. Other C++
-dependencies in the same `ci-windows-msvc` build keep the installed MSVC
-compiler; no whole-build V8 compiler flag is needed.
+The V8 Windows profile sets `@llvm//config:nostdincxx` and
+`@llvm//config:nostdlibxx`, then explicitly supplies Chromium's pinned libc++
+headers and archive. These settings are target-scoped: unrelated execution
+tools retain their default C++ runtime. V8's own generator binaries explicitly
+reapply the private-runtime policy after the execution transition. Neither flag
+suppresses C headers, the SDK, CRT, compiler-rt, or the independent unwinder.
 
-This is a native Windows build, not an x64-to-ARM64 or remote Linux build:
-V8's snapshot generator must execute on the target architecture. The repository
-inputs pinned in #4009 are MSVC/SDK files, not a registered clang-cl toolchain;
-making them replace the installed SDK is the separate hermetic MSVC migration.
+Torque and other ordinary generators execute on Linux. The Windows snapshot
+generator is instead a Windows x64 payload compiled with the same `@llvm`
+toolchain, executed by declared Wine on an x64 Linux remote worker. This keeps
+V8's Windows-host unwind writer enabled, including generated `.pdata`/`.xdata`.
+No installed Visual Studio or ambient Windows toolchain is used. ARM64 uses
+V8's x64-hosted ARM64 generator; its full build remains a separate validation.
+
+Windows binding generation on Linux builds bindgen against the selected LLVM sources,
+so its embedded libclang understands that toolchain's resource headers. The
+prebuilt bindgen remains the fallback for other target/execution pairs. This source build can
+be substantially larger than downloading a prebuilt generator.
+
+See [the MSVC proof record](MSVC_PROOF.md) for exact revisions, failure owners,
+commands, action/artifact evidence, and unvalidated platforms.
 
 Release and CI Cargo builds for Darwin and Linux use `RUSTY_V8_ARCHIVE` plus a
 downloaded `RUSTY_V8_SRC_BINDING_PATH` to point at those `openai/codex` release

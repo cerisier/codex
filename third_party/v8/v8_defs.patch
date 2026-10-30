@@ -3,13 +3,19 @@
 # and dependency choices live in third_party/v8/engine.BUILD.bazel. ABI,
 # runtime and CPU settings are internal outputs of artifact_profile.bzl.
 # Preserve Chromium libc++ headers/runtime, Clang Windows driver flags, and
-# the Windows target-ABI snapshot tool. The optional
+# the target-ABI settings on the exec-platform snapshot tool. The optional
 # Linux backtrace link flag is omitted because that feature is fixed off.
 # On a V8 pin change, review these hunks and build the native canary matrix.
 
 diff --git a/orig/v8-15.2.124.1/bazel/defs.bzl b/mod/v8-15.2.124.1/bazel/defs.bzl
 --- a/orig/v8-15.2.124.1/bazel/defs.bzl
 +++ b/mod/v8-15.2.124.1/bazel/defs.bzl
+@@ -8,4 +8,4 @@
+
+ load("@rules_cc//cc:cc_library.bzl", "cc_library")
+-load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
++load("@@//third_party/v8:binary.bzl", cc_binary = "v8_cc_binary")
+ load("@rules_cc//cc/common:cc_common.bzl", "cc_common")
 @@ -19,7 +19,7 @@
 
  _create_option_flag = rule(
@@ -163,81 +169,6 @@ diff --git a/orig/v8-15.2.124.1/bazel/defs.bzl b/mod/v8-15.2.124.1/bazel/defs.bz
          }),
      )
 
-@@ -466,6 +521,12 @@
- def _mksnapshot(ctx):
-     prefix = ctx.attr.prefix
-     suffix = ctx.attr.suffix
-+
-+    # Windows cross-builds use Linux for the exec configuration, but the
-+    # snapshot generator must match the target ABI and run on the Windows
-+    # runner. Action strategies only choose where an action runs; they cannot
-+    # change this executable from the exec to the target configuration.
-+    tool = ctx.executable.target_tool if ctx.attr.target_os == "win" else ctx.executable.tool
-     outs = [
-         ctx.actions.declare_file(prefix + "/snapshot" + suffix + ".cc"),
-         ctx.actions.declare_file(prefix + "/embedded" + suffix + ".S"),
-@@ -483,9 +544,22 @@
-             "--embedded_src",
-             outs[1].path,
-         ] + ctx.attr.args,
--        executable = ctx.executable.tool,
-+        executable = tool,
-         progress_message = "Running mksnapshot",
-     )
-+    if ctx.attr.inline_asm_converter:
-+        # The installed Windows toolchain sends .S files to MASM. V8 provides
-+        # this conversion for clang-cl so its generated assembly is compiled
-+        # as C++, using the same target flags as the rest of the engine.
-+        embedded_cc = ctx.actions.declare_file(prefix + "/embedded" + suffix + ".cc")
-+        ctx.actions.run(
-+            executable = ctx.attr.inline_asm_converter[DefaultInfo].files_to_run,
-+            inputs = [outs[1]],
-+            outputs = [embedded_cc],
-+            arguments = [outs[1].path, embedded_cc.path],
-+            mnemonic = "V8NativeWindowsInlineAssembly",
-+        )
-+        outs = [outs[0], embedded_cc]
-     return [DefaultInfo(files = depset(outs))]
-
- _v8_mksnapshot = rule(
-@@ -498,6 +572,13 @@
-             executable = True,
-             cfg = "exec",
-         ),
-+        "target_tool": attr.label(
-+            mandatory = True,
-+            allow_files = True,
-+            executable = True,
-+            cfg = "target",
-+        ),
-+        "inline_asm_converter": attr.label(executable = True, cfg = "exec"),
-         "target_os": attr.string(mandatory = True),
-         "prefix": attr.string(mandatory = True),
-         "suffix": attr.string(mandatory = True),
-@@ -511,6 +592,11 @@
-         args = args,
-         prefix = "noicu",
-         tool = ":noicu/mksnapshot" + suffix,
-+        target_tool = ":noicu/mksnapshot" + suffix,
-+        inline_asm_converter = select({
-+            "@@//third_party/v8:platform_windows_msvc": ":native_windows_inline_asm",
-+            "//conditions:default": None,
-+        }),
-         suffix = suffix,
-         target_os = select({
-             "@v8//bazel/config:is_macos": "mac",
-@@ -523,6 +609,11 @@
-         args = args,
-         prefix = "icu",
-         tool = ":icu/mksnapshot" + suffix,
-+        target_tool = ":icu/mksnapshot" + suffix,
-+        inline_asm_converter = select({
-+            "@@//third_party/v8:platform_windows_msvc": ":native_windows_inline_asm",
-+            "//conditions:default": None,
-+        }),
-         suffix = suffix,
-         target_os = select({
-             "@v8//bazel/config:is_macos": "mac",
 diff --git a/orig/v8-15.2.124.1/bazel/config/v8-target-cpu.bzl b/mod/v8-15.2.124.1/bazel/config/v8-target-cpu.bzl
 --- a/orig/v8-15.2.124.1/bazel/config/v8-target-cpu.bzl
 +++ b/mod/v8-15.2.124.1/bazel/config/v8-target-cpu.bzl

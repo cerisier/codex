@@ -1,0 +1,18 @@
+load(":toolchain.bzl", "bindgen_toolchain")
+
+bindgen_toolchain(
+    name = "source",
+    bindgen = "@bindgen_crates//:bindgen-cli__bindgen",
+)
+
+toolchain(
+    name = "windows_msvc",
+    exec_compatible_with = ["@platforms//os:linux"],
+    target_compatible_with = [
+        "@platforms//os:windows",
+        "@llvm//constraints/windows/abi:msvc",
+    ],
+    toolchain = "source",
+    toolchain_type = "@rules_rs//rs:bindgen_toolchain_type",
+    visibility = ["//visibility:public"],
+)
