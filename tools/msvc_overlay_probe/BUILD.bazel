@@ -1,0 +1,6 @@
+load("sdk_overlay_probe.bzl", "sdk_overlay_probe")
+
+sdk_overlay_probe(
+    name = "probe",
+    tags = ["manual"],
+)
