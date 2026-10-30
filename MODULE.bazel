@@ -9,16 +9,11 @@ bazel_dep(name = "protobuf", version = "34.0.bcr.1", repo_name = "com_google_pro
 bazel_dep(name = "llvm", version = "0.8.11")
 bazel_dep(name = "windows_support", version = "0.2.0")
 
-# Patch hermetic LLVM for Codex's custom libc++ and Windows gnullvm runtime
-# needs that have not landed upstream.
-single_version_override(
+# Dedicated MSVC integration proof against clean hermetic-llvm main
+# fd2addebff08b29675ee266bc2766e475ce9263b. No toolchain source patches.
+local_path_override(
     module_name = "llvm",
-    patch_strip = 1,
-    patches = [
-        "//patches:llvm_rusty_v8_custom_libcxx.patch",
-        "//patches:llvm_windows_arm64_powl.patch",
-        "//patches:llvm_windows_mingw_compat.patch",
-    ],
+    path = "../hermetic-llvm-current",
 )
 
 # Preserve case-only SDK aliases when native Windows repository setup feeds
@@ -145,7 +140,7 @@ use_repo(osx, "macos_sdk")
 
 # Needed to disable xcode...
 bazel_dep(name = "apple_support", version = "2.1.0")
-bazel_dep(name = "rules_cc", version = "0.2.18")
+bazel_dep(name = "rules_cc", version = "0.2.25")
 
 # Windows voice jobs explicitly select the installed MSVC C toolchains.
 cc_configure = use_extension("@rules_cc//cc:extensions.bzl", "cc_configure_extension")
@@ -161,7 +156,7 @@ single_version_override(
 
 bazel_dep(name = "rules_platform", version = "0.1.0")
 bazel_dep(name = "rules_pkg", version = "1.0.1")
-bazel_dep(name = "aws-lc", version = "5.1.0.bcr.1")
+bazel_dep(name = "aws-lc", version = "5.1.0.bcr.3")
 bazel_dep(name = "rules_rs", version = "0.0.96")
 bazel_dep(name = "rules_foreign_cc", version = "0.15.1")
 single_version_override(
@@ -225,6 +220,8 @@ rules_rust.patch(
         # Carry the OpenAI setup fix that makes build-script tools available
         # through their runfiles after the rules_rs upgrade.
         "//patches:rules_rust_build_script_tools_transition.patch",
+        "//patches:rules_rust_clang_cl_build_script_paths.patch",
+        "//patches:rules_rust_prost_remove_grep_includes.patch",
         # Opt-in release profile compatibility for native Cargo build scripts.
         "//patches:rules_rust_release_build_script_profile.patch",
         # Prefer Rust's direct linker for Windows/MSVC and keep hermetic
@@ -394,10 +391,11 @@ crate.annotation(
     # Daemon tests repeatedly hash large CLI binaries, even in fastbuild mode.
     # Optimize the native backends as well as the Rust implementation.
     build_script_env = {"OPT_LEVEL": "3"},
-    # The Windows lint toolchain cannot reliably materialize blake3's native x86 assembly archives.
+    # Avoid native x86 assembly tools unavailable when cross-compiling Windows.
     crate = "blake3",
     crate_features_select = {
         "x86_64-pc-windows-gnullvm": ["pure"],
+        "x86_64-pc-windows-msvc": ["pure"],
     },
     rustc_flags = ["-Copt-level=3"],
 )
