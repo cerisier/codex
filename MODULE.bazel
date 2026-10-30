@@ -225,6 +225,7 @@ rules_rust.patch(
         "//patches:rules_rust_prost_remove_grep_includes.patch",
         # Opt-in release profile compatibility for native Cargo build scripts.
         "//patches:rules_rust_release_build_script_profile.patch",
+        "//patches:rules_rust_cargo_target_flags.patch",
         # Prefer Rust's direct linker for Windows/MSVC and keep hermetic
         # LLVM's non-.lib runtime artifacts compatible with it.
         "//patches:rules_rust_windows_msvc_direct_link_args.patch",

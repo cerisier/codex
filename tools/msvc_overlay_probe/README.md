@@ -79,6 +79,26 @@ bazel test --config=buildbuddy-generic-rbe --host_platform=//:rbe \
 Initial passing invocation: `b3b18d63-b469-4b43-8487-b825517f1f03`.
 These probes are regression evidence, not a substitute for the full CLI build.
 
+## Target configuration versus build-script compilation
+
+The probe also checks `CARGO_CFG_TARGET_FEATURE` contains `crt-static`, matching
+the selected Rust target toolchain. Without target flags on the runner's
+`rustc --print=cfg` query, this assertion fails:
+`8237b281-8ea9-47f8-ab6d-d3ed5638acb5`. This mismatch made rusty_v8 request
+dynamic `msvcprt.lib` despite the actual target using static CRT.
+
+`rules_rust_cargo_target_flags.patch` passes configured target flags through a
+separate internal environment variable. The `rustc_flags` attribute belongs to
+the build-script executable, not this target query. The probe compiles its
+script with an `@$(location ...)` response file in `compile_data`; forwarding
+that unexpanded attribute to the query fails before the script runs
+(`74562cf9-de78-4e27-bcb1-947e5bddf056`). Keeping the two flag sets separate
+passes both assertions and the SDK lookup
+(`4941fbb0-4b8e-4daa-aa58-48554aeb2a14`).
+
+Runner library/binary and bindgen helper test targets all pass together:
+`039d2565-916c-4c5f-87fd-fce239a0aa2f` (five test targets).
+
 ## Real CLI, direct hermetic LLVM link
 
 The real executable now builds without `cc_common.link`, with unchanged

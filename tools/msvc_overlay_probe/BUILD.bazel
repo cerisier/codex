@@ -9,8 +9,13 @@ sdk_overlay_probe(
 cargo_build_script(
     name = "cargo_probe",
     srcs = ["build.rs"],
+    compile_data = ["build_script.rustc_flags"],
     crate_root = "build.rs",
     edition = "2021",
+    rustc_flags = ["@$(location :build_script.rustc_flags)"],
     tags = ["manual"],
-    target_compatible_with = ["@platforms//os:windows"],
+    target_compatible_with = [
+        "@platforms//os:windows",
+        "@llvm//constraints/windows/abi:msvc",
+    ],
 )
