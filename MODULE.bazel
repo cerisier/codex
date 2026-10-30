@@ -221,12 +221,14 @@ rules_rust.patch(
         # through their runfiles after the rules_rs upgrade.
         "//patches:rules_rust_build_script_tools_transition.patch",
         "//patches:rules_rust_clang_cl_build_script_paths.patch",
+        "//patches:rules_rust_json_vfs_overlay_cwd.patch",
         "//patches:rules_rust_prost_remove_grep_includes.patch",
         # Opt-in release profile compatibility for native Cargo build scripts.
         "//patches:rules_rust_release_build_script_profile.patch",
         # Prefer Rust's direct linker for Windows/MSVC and keep hermetic
         # LLVM's non-.lib runtime artifacts compatible with it.
         "//patches:rules_rust_windows_msvc_direct_link_args.patch",
+        "//patches:rules_rust_clang_cl_direct_link_forwarding.patch",
         # Skip transient native-Windows linker outputs while consolidating
         # dependency search paths.
         "//patches:rules_rust_windows_process_wrapper_skip_temp_outputs.patch",

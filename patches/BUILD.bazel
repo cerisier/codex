@@ -8,6 +8,8 @@ exports_files([
     "mxc-sdk_utf8_resources.patch",
     "rules_rust_build_script_tools_transition.patch",
     "rules_rust_clang_cl_build_script_paths.patch",
+    "rules_rust_clang_cl_direct_link_forwarding.patch",
+    "rules_rust_json_vfs_overlay_cwd.patch",
     "rules_rust_compiler_thp.patch",
     "rules_rust_process_wrapper_param_file.patch",
     "rules_rust_prost_remove_grep_includes.patch",

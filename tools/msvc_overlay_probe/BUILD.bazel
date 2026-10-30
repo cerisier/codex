@@ -1,6 +1,16 @@
+load("@rules_rust//cargo:defs.bzl", "cargo_build_script")
 load("sdk_overlay_probe.bzl", "sdk_overlay_probe")
 
 sdk_overlay_probe(
     name = "probe",
     tags = ["manual"],
+)
+
+cargo_build_script(
+    name = "cargo_probe",
+    srcs = ["build.rs"],
+    crate_root = "build.rs",
+    edition = "2021",
+    tags = ["manual"],
+    target_compatible_with = ["@platforms//os:windows"],
 )
