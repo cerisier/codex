@@ -1,71 +1,98 @@
+diff --git a/cargo/private/cargo_build_script.bzl b/cargo/private/cargo_build_script.bzl
+index cf96c2517..87e5fc47a 100644
+--- a/cargo/private/cargo_build_script.bzl
++++ b/cargo/private/cargo_build_script.bzl
+@@ -14,2 +14,3 @@ load(
+     "//rust/private:rustc.bzl",
++    "collect_configuration_rustc_flags",
+     "collect_extra_rustc_flags",
+@@ -682,2 +683,7 @@ def _cargo_build_script_impl(ctx):
+     args = ctx.actions.args()
++
++    # Query this configuration, not the build-script executable or an assumed
++    # consumer crate type. Executable rustc_flags may reference compile-only data.
++    args.add(toolchain.sysroot, format = "--target_rustc_flag=--sysroot=%s")
++    args.add_all(collect_configuration_rustc_flags(ctx, toolchain), format_each = "--target_rustc_flag=%s")
+     args.add(script, format = "--script=%s")
 diff --git a/cargo/private/cargo_build_script_runner/bin.rs b/cargo/private/cargo_build_script_runner/bin.rs
-index 1e74fb9..7a4723a 100644
+index 0e71e3491..c6385c63b 100644
 --- a/cargo/private/cargo_build_script_runner/bin.rs
 +++ b/cargo/private/cargo_build_script_runner/bin.rs
-@@ -82,8 +82,16 @@ fn run_buildrs() -> Result<(), String> {
-         }
-     }
+@@ -89,2 +89,3 @@ fn run_buildrs() -> Result<(), String> {
+         input_dep_env_paths,
++        target_rustc_flags,
+         cargo_manifest_maker,
+@@ -126,4 +127,9 @@ fn run_buildrs() -> Result<(), String> {
  
 -    let target_env_vars =
 -        get_target_env_vars(&rustc_env).expect("Error getting target env vars from rustc");
-+    // Query the configured target, not the build-script executable's flags.
-+    // In particular, +crt-static changes CARGO_CFG_TARGET_FEATURE and native
-+    // library selection. Decode Bazel's separator and execroot placeholders
-+    // before invoking rustc, while cwd is still the execution root.
-+    let encoded_rustflags = env::var("RULES_RUST_TARGET_RUSTFLAGS")
-+        .unwrap_or_default()
-+        .replace("\\x1f", "\x1f")
-+        .replace("${pwd}", &exec_root.to_string_lossy());
-+    let target_env_vars = get_target_env_vars(&rustc_env, &encoded_rustflags)
++    // Query before changing cwd so toolchain paths resolve from the execroot.
++    let target_rustc_flags: Vec<_> = target_rustc_flags
++        .iter()
++        .map(|flag| flag.replace("${pwd}", &exec_root.to_string_lossy()))
++        .collect();
++    let target_env_vars = get_target_env_vars(&rustc_env, &target_rustc_flags)
 +        .expect("Error getting target env vars from rustc");
  
-     let script_path = exec_root.join(&progname);
-     let mut command = Command::new(&script_path);
-@@ -472,7 +480,10 @@ impl Args {
-     }
- }
+@@ -429,2 +435,3 @@ struct Args {
+     input_dep_env_paths: Vec<String>,
++    target_rustc_flags: Vec<String>,
+     cargo_manifest_maker: RunfilesMaker,
+@@ -457,2 +464,3 @@ impl Args {
+         let mut input_dep_env_paths = Vec::new();
++        let mut target_rustc_flags = Vec::new();
+         let mut cargo_manifest_maker: Result<RunfilesMaker, String> =
+@@ -488,2 +496,4 @@ impl Args {
+                 input_dep_env_paths.push(arg.split_off("--input_dep_env_path=".len()));
++            } else if arg.starts_with("--target_rustc_flag=") {
++                target_rustc_flags.push(arg.split_off("--target_rustc_flag=".len()));
+             } else if arg.starts_with("--cargo_manifest_args=") {
+@@ -511,2 +521,3 @@ impl Args {
+             input_dep_env_paths,
++            target_rustc_flags,
+             cargo_manifest_maker: cargo_manifest_maker.unwrap(),
+@@ -517,3 +528,6 @@ impl Args {
  
 -fn get_target_env_vars<P: AsRef<Path>>(rustc: &P) -> Result<BTreeMap<String, String>, String> {
 +fn get_target_env_vars<P: AsRef<Path>>(
 +    rustc: &P,
-+    encoded_rustflags: &str,
++    target_rustc_flags: &[String],
 +) -> Result<BTreeMap<String, String>, String> {
      // As done by Cargo when constructing a cargo::core::compiler::build_context::target_info::TargetInfo.
-     let output = Command::new(rustc.as_ref())
-         .arg("--print=cfg")
-@@ -480,6 +491,7 @@ fn get_target_env_vars<P: AsRef<Path>>(rustc: &P) -> Result<BTreeMap<String, Str
-             "--target={}",
-             env::var("TARGET").expect("missing TARGET")
+@@ -525,2 +539,3 @@ fn get_target_env_vars<P: AsRef<Path>>(rustc: &P) -> Result<BTreeMap<String, Str
          ))
-+        .args(encoded_rustflags.split('\x1f').filter(|flag| !flag.is_empty()))
++        .args(target_rustc_flags)
          .output()
-         .map_err(|err| format!("Error running rustc to get target information: {err}"))?;
-     if !output.status.success() {
-diff --git a/cargo/private/cargo_build_script.bzl b/cargo/private/cargo_build_script.bzl
-index d6394f7..86fa5d4 100644
---- a/cargo/private/cargo_build_script.bzl
-+++ b/cargo/private/cargo_build_script.bzl
-@@ -639,12 +639,19 @@ def _cargo_build_script_impl(ctx):
-             for source, destination in vfs_overlays.items()
-         })
+diff --git a/rust/private/rustc.bzl b/rust/private/rustc.bzl
+index efc3c9ccf..075f01196 100644
+--- a/rust/private/rustc.bzl
++++ b/rust/private/rustc.bzl
+@@ -1892,2 +1892,21 @@ def collect_extra_rustc_flags(ctx, toolchain, crate_root, crate_type):
  
--    # Inform build scripts of rustc flags
--    # https://github.com/rust-lang/cargo/issues/9600
--    env["CARGO_ENCODED_RUSTFLAGS"] = "\\x1f".join([
-+    target_rustc_flags = [
-         # Allow build scripts to locate the generated sysroot
-         "--sysroot=${{pwd}}/{}".format(toolchain.sysroot),
--    ] + ctx.attr.rustc_flags)
-+    ] + collect_extra_rustc_flags(ctx, toolchain, None, "rlib")
++    flags.extend(collect_configuration_rustc_flags(ctx, toolchain))
 +
-+    # The cfg query describes the target crate, not the build-script executable.
-+    # rustc_flags belongs to that executable and can reference compile-only data
-+    # via location expansions. Do not execute those flags in the target query.
-+    env["RULES_RUST_TARGET_RUSTFLAGS"] = "\\x1f".join(target_rustc_flags)
++    if hasattr(ctx.attr, "_per_crate_rustc_flag") and not is_exec_configuration(ctx):
++        per_crate_rustc_flags = ctx.attr._per_crate_rustc_flag[PerCrateRustcFlagsInfo].per_crate_rustc_flags
++        flags.extend(_collect_per_crate_rustc_flags(ctx, crate_root, per_crate_rustc_flags))
 +
-+    # Inform build scripts of target flags, preserving the legacy attribute.
-+    # https://github.com/rust-lang/cargo/issues/9600
-+    env["CARGO_ENCODED_RUSTFLAGS"] = "\\x1f".join(target_rustc_flags + ctx.attr.rustc_flags)
++    return flags
++
++def collect_configuration_rustc_flags(ctx, toolchain):
++    """Gather configuration-wide flags without assuming a consumer crate.
++
++    Args:
++        ctx (ctx): The current rule's context object.
++        toolchain (rust_toolchain): The current Rust toolchain.
++
++    Returns:
++        List[str]: Toolchain and available build-setting flags, in compiler order.
++    """
++    flags = []
+     is_exec = is_exec_configuration(ctx)
+@@ -1902,6 +1921,2 @@ def collect_extra_rustc_flags(ctx, toolchain, crate_root, crate_type):
  
-     for f in ctx.attr.crate_features:
-         env["CARGO_FEATURE_" + f.upper().replace("-", "_")] = "1"
+-    if hasattr(ctx.attr, "_per_crate_rustc_flag") and not is_exec:
+-        per_crate_rustc_flags = ctx.attr._per_crate_rustc_flag[PerCrateRustcFlagsInfo].per_crate_rustc_flags
+-        flags.extend(_collect_per_crate_rustc_flags(ctx, crate_root, per_crate_rustc_flags))
+-
+     if hasattr(ctx.attr, "_extra_exec_rustc_flags") and is_exec:
