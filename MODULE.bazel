@@ -207,7 +207,7 @@ single_version_override(
     patch_strip = 1,
     patches = [
         "//patches:rules_rs_build_script_deps_annotation.patch",
-        "//patches:rules_rs_bindgen_msvc_include_order.patch",
+        "//patches:rules_rs_bindgen_clang_cl_driver.patch",
         "//patches:rules_rs_rust_debug_modes.patch",
         "//patches:rules_rs_windows_msvc_linker.patch",
         "//patches:rules_rs_workspace_package_version.patch",

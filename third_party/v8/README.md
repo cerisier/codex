@@ -134,6 +134,10 @@ and Chromium libc++ profile. The bindings use V8's compiled headers and defines
 so their sizes follow the archive, including CppGC members. Bazel MSVC consumers
 use the newly built archive and bindings together.
 
+Binding generation reuses `V8_COPTS`, including native `/std:c++20` on MSVC.
+The clang-cl bindgen action passes toolchain and caller arguments through in CL
+driver mode instead of translating their header-search or warning semantics.
+
 The owned engine policy preserves the GN MSVC defaults for GC-managed microtask
 queues, random Wasm module generation, disabled imminent-deprecation warnings,
 and external TypedArray backing stores. Other source targets retain the published
