@@ -213,6 +213,8 @@ rules_rust.patch(
     patches = [
         # Opt-in release profile compatibility for native Cargo build scripts.
         "//patches:rules_rust_release_build_script_profile.patch",
+        # Refreshed upstream PR #92; forwarding comes from merged #102.
+        "//patches:rules_rust_declared_msvc_linker.patch",
         # Spill wrapper arguments to a params file to avoid Windows command-line limits.
         "//patches:rules_rust_process_wrapper_param_file.patch",
         "//patches:rules_rust_windows_execroot_separators.patch",
