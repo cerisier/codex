@@ -155,6 +155,13 @@ use_repo(cc_configure, "local_config_cc")
 bazel_dep(name = "rules_platform", version = "0.1.0")
 bazel_dep(name = "rules_pkg", version = "1.0.1")
 bazel_dep(name = "aws-lc", version = "5.1.0.bcr.3")
+bazel_dep(name = "sqlite3", version = "3.53.4")
+single_version_override(
+    module_name = "sqlite3",
+    patch_strip = 1,
+    patches = ["//patches:sqlite3_configurable_library.patch"],
+)
+
 bazel_dep(name = "rules_rs", version = "0.0.96")
 bazel_dep(name = "rules_foreign_cc", version = "0.15.1")
 single_version_override(
@@ -619,11 +626,13 @@ llvm = use_extension("@llvm//extensions:llvm.bzl", "llvm")
 use_repo(llvm, "llvm-project")
 
 crate.annotation(
-    # Disable SQLite intrinsics that can crash at startup on older x64 Windows CPUs.
-    build_script_env_select = {
-        "x86_64-pc-windows-msvc": '{"LIBSQLITE3_FLAGS": "SQLITE_DISABLE_INTRINSIC"}',
-    },
+    additive_build_file = "//third_party/sqlite:libsqlite3_sys.BUILD.bazel",
     crate = "libsqlite3-sys",
+    extra_aliased_targets = {"libsqlite3_sys_bindings": "sqlite3/bindgen_bundled_version.rs"},
+    gen_build_script = "off",
+    repositories = ["crates"],
+    version = "0.37.0",
+    deps = ["//third_party/sqlite:libsqlite3_sys_build_info"],
 )
 crate.annotation(
     # Provide the hermetic SDK path so the build script doesn't try to invoke an unhermetic `xcrun --show-sdk-path`.
