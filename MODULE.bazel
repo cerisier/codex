@@ -4,6 +4,9 @@ bazel_dep(name = "bazel_lib", version = "3.2.2")
 bazel_dep(name = "bazel_skylib", version = "1.9.0")
 bazel_dep(name = "platforms", version = "1.0.0")
 
+# Expose rules_rs's existing dependency for the openssl-sys replacement's SBOM.
+bazel_dep(name = "package_metadata", version = "0.0.7")
+
 # Expose the public protobuf rules already used transitively by rules_rs.
 bazel_dep(name = "protobuf", version = "34.0.bcr.1", repo_name = "com_google_protobuf")
 bazel_dep(name = "llvm", version = "0.8.11")
@@ -481,25 +484,6 @@ bazel_dep(name = "openssl", version = "3.5.4.bcr.0")
 
 inject_repo(crate, "xz")
 
-crate.annotation(
-    build_script_data = [
-        "@openssl//:gen_dir",
-    ],
-    # Build scripts compile in Bazel's exec configuration, so target-specific
-    # optional build deps are otherwise dropped for the musl release platforms.
-    build_script_deps = [
-        "@crates//:openssl-src-300.6.1+3.6.3",
-    ],
-    build_script_env = {
-        "OPENSSL_DIR": "$(execpath @openssl//:gen_dir)",
-        "OPENSSL_NO_VENDOR": "1",
-        "OPENSSL_STATIC": "1",
-    },
-    crate = "openssl-sys",
-    data = ["@openssl//:gen_dir"],
-    gen_build_script = "on",
-)
-
 inject_repo(crate, "openssl")
 
 crate.annotation(
@@ -527,6 +511,22 @@ crate.annotation(
 )
 
 http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+
+# Cargo keeps vendored OpenSSL for musl; Bazel already supplies its own OpenSSL.
+# Replace this crate's generated build, not Cargo's feature resolution.
+http_archive(
+    name = "openssl_sys_bazel",
+    build_file = "//third_party/openssl:openssl_sys.BUILD.bazel",
+    sha256 = "82cab2d520aa75e3c58898289429321eb788c3106963d0dc886ec7a5f4adc321",
+    strip_prefix = "openssl-sys-0.9.111",
+    type = "tar.gz",
+    urls = ["https://static.crates.io/crates/openssl-sys/openssl-sys-0.9.111.crate"],
+)
+
+override_repo(
+    crate,
+    **{"crates__openssl-sys-0.9.111": "openssl_sys_bazel"}
+)
 
 codex_release_archive = use_repo_rule("//bazel/extensions:codex_release_archive.bzl", "codex_release_archive")
 
