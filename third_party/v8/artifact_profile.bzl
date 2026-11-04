@@ -9,11 +9,8 @@ _POINTER_COMPRESSION = "@v8//:v8_enable_pointer_compression"
 _SANDBOX = "@v8//:v8_enable_sandbox"
 _LIBCXX = "@v8//:v8_use_rusty_v8_custom_libcxx"
 _TARGET_CPU = "@v8//bazel/config:v8_target_cpu"
-_TOOLCHAINS = "//command_line_option:extra_toolchains"
-_NATIVE_WINDOWS_TOOLCHAINS = [
-    str(Label("@v8_native_windows_cc//:cc-toolchain-x64_windows")),
-    str(Label("@v8_native_windows_cc//:cc-toolchain-arm64_windows")),
-]
+_NOSTDINCXX = "@llvm//config:nostdincxx"
+_NOSTDLIBXX = "@llvm//config:nostdlibxx"
 _CPU_CONSTRAINTS = {
     "arm64": Label("@platforms//cpu:aarch64"),
     "x64": Label("@platforms//cpu:x86_64"),
@@ -26,15 +23,14 @@ def _artifact_profile_impl(settings, attr):
         _SANDBOX: sandbox,
         _LIBCXX: attr.profile != "source",
         _TARGET_CPU: attr.v8_cpu,
-        # Select clang-cl only below the V8 archive/binding boundary. Keep the
-        # caller's toolchains (including the ordinary MSVC compiler) elsewhere.
-        _TOOLCHAINS: settings[_TOOLCHAINS] + (_NATIVE_WINDOWS_TOOLCHAINS if attr.native_windows else []),
+        _NOSTDINCXX: True if attr.native_windows and attr.profile != "source" else settings[_NOSTDINCXX],
+        _NOSTDLIBXX: True if attr.native_windows and attr.profile != "source" else settings[_NOSTDLIBXX],
     }
 
 _artifact_profile = transition(
     implementation = _artifact_profile_impl,
-    inputs = [_TOOLCHAINS],
-    outputs = [_POINTER_COMPRESSION, _SANDBOX, _LIBCXX, _TARGET_CPU, _TOOLCHAINS],
+    inputs = [_NOSTDINCXX, _NOSTDLIBXX],
+    outputs = [_POINTER_COMPRESSION, _SANDBOX, _LIBCXX, _TARGET_CPU, _NOSTDINCXX, _NOSTDLIBXX],
 )
 
 def _profiled_files_impl(ctx):

@@ -8,6 +8,7 @@ bazel_dep(name = "platforms", version = "1.0.0")
 bazel_dep(name = "protobuf", version = "34.0.bcr.1", repo_name = "com_google_protobuf")
 bazel_dep(name = "llvm", version = "0.8.11")
 bazel_dep(name = "windows_support", version = "0.2.0")
+bazel_dep(name = "with_cfg.bzl", version = "0.12.0")
 
 # Merged target-scoped C++ standard-library opt-outs for V8's private libc++.
 # https://github.com/hermeticbuild/hermetic-llvm/pull/903
@@ -844,17 +845,6 @@ pip.parse(
     ],
 )
 use_repo(pip, "v8_python_deps")
-
-native_windows_llvm = use_repo_rule("//third_party/v8:native_windows.bzl", "native_windows_llvm")
-
-native_windows_llvm(name = "v8_native_windows_llvm")
-
-native_windows_cc = use_repo_rule("//third_party/v8:native_windows.bzl", "native_windows_cc")
-
-native_windows_cc(
-    name = "v8_native_windows_cc",
-    native_llvm = "@v8_native_windows_llvm//:BUILD.bazel",
-)
 
 v8_dependencies = use_extension("//third_party/v8:dependencies.bzl", "dependencies")
 use_repo(
