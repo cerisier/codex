@@ -1,14 +1,19 @@
 --- a/cargo/private/cargo_build_script_runner/lib.rs
 +++ b/cargo/private/cargo_build_script_runner/lib.rs
-@@ -337,9 +337,18 @@
+@@ -377,14 +377,23 @@
              return "${pwd}".to_owned();
          }
  
 -        value
 +        let redacted = value
              .replace(&format!("{exec_root}/"), "${pwd}/")
--            .replace(&format!("{exec_root}\\"), "${pwd}\\")
-+            .replace(&format!("{exec_root}\\"), "${pwd}\\");
+             .replace(&format!("{exec_root}\\"), "${pwd}\\")
+             // Flags such as `--remap-path-prefix=<exec_root>=.` (which build
+             // scripts see in CARGO_ENCODED_RUSTFLAGS and may echo back as
+             // `cargo:rustc-env`) follow the exec root with `=`. Leaving it
+             // unredacted bakes the per-action sandbox path into the output.
+-            .replace(&format!("{exec_root}="), "${pwd}=")
++            .replace(&format!("{exec_root}="), "${pwd}=");
 +        #[cfg(windows)]
 +        let redacted = {
 +            // pkg-config can emit forward slashes for the same Windows root.
@@ -21,9 +26,9 @@
      }
  
      /// Redact for env vars: uses the generic `${out_dir}` token, resolved
-@@ -630,6 +639,28 @@
-                 link_search_paths:
-                     "-L${pwd}/${bazel-out/cfg/bin/pkg/_bs.out_dir}\n-L${pwd}/other/path".to_owned(),
+@@ -736,6 +745,28 @@
+                 cdylib_link_flags: "".to_owned(),
+                 bin_link_flags: "".to_owned(),
              }
 +        );
 +    }

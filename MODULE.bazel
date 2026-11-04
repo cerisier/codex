@@ -195,33 +195,24 @@ register_toolchains("@rules_foreign_cc//toolchains:built_make_toolchain")
 foreign_cc_tools = use_extension("@rules_foreign_cc//foreign_cc:extensions.bzl", "tools")
 use_repo(foreign_cc_tools, "cmake-3.31.8-windows-x86_64", "pkgconfig_src")
 
-single_version_override(
+archive_override(
     module_name = "rules_rs",
+    integrity = "sha256-uSuiv3XJzyOZWYjDtDBIwp6mIrNU5dg4FVybhjpv2c0=",
     patch_strip = 1,
     patches = [
         "//patches:rules_rs_build_script_deps_annotation.patch",
         "//patches:rules_rs_rust_debug_modes.patch",
-        "//patches:rules_rs_windows_msvc_linker.patch",
         "//patches:rules_rs_workspace_package_version.patch",
-        "//patches:rules_rs_zlib_snapshot_urls.patch",
     ],
-    version = "0.0.96",
+    strip_prefix = "rules_rs-97157ddbff0dd427e33a02910d035f724e2dfe37",
+    urls = ["https://github.com/hermeticbuild/rules_rs/archive/97157ddbff0dd427e33a02910d035f724e2dfe37.tar.gz"],
 )
 
 rules_rust = use_extension("@rules_rs//rs:rules_rust.bzl", "rules_rust")
 rules_rust.patch(
     patches = [
-        # Carry the OpenAI setup fix that makes build-script tools available
-        # through their runfiles after the rules_rs upgrade.
-        "//patches:rules_rust_build_script_tools_transition.patch",
         # Opt-in release profile compatibility for native Cargo build scripts.
         "//patches:rules_rust_release_build_script_profile.patch",
-        # Prefer Rust's direct linker for Windows/MSVC and keep hermetic
-        # LLVM's non-.lib runtime artifacts compatible with it.
-        "//patches:rules_rust_windows_msvc_direct_link_args.patch",
-        # Skip transient native-Windows linker outputs while consolidating
-        # dependency search paths.
-        "//patches:rules_rust_windows_process_wrapper_skip_temp_outputs.patch",
         # Spill wrapper arguments to a params file to avoid Windows command-line limits.
         "//patches:rules_rust_process_wrapper_param_file.patch",
         "//patches:rules_rust_windows_execroot_separators.patch",
@@ -383,12 +374,16 @@ crate.annotation(
     # Daemon tests repeatedly hash large CLI binaries, even in fastbuild mode.
     # Optimize the native backends as well as the Rust implementation.
     build_script_env = {"OPT_LEVEL": "3"},
-    # The Windows lint toolchain cannot reliably materialize blake3's native x86 assembly archives.
     crate = "blake3",
-    crate_features_select = {
-        "x86_64-pc-windows-gnullvm": ["pure"],
-    },
     rustc_flags = ["-Copt-level=3"],
+)
+crate.annotation_select(
+    # Avoid native x86 assembly tools unavailable when cross-compiling Windows.
+    crate = "blake3",
+    crate_features = ["pure"],
+    triples = [
+        "x86_64-pc-windows-gnullvm",
+    ],
 )
 
 # Match the CodeModeHost response-compression benchmark's zstd level.
@@ -589,23 +584,27 @@ crate.annotation(
         "RUSTY_V8_SRC_BINDING_PATH": "$(execpath @v8_targets//:rusty_v8_binding_for_target)",
     },
     crate = "v8",
-    # Keep the Rust feature aligned with the sandbox archive/binding pairs.
-    crate_features_select = {
-        "aarch64-apple-darwin": ["v8_enable_sandbox"],
-        "aarch64-pc-windows-gnullvm": ["v8_enable_sandbox"],
-        "aarch64-pc-windows-msvc": ["v8_enable_sandbox"],
-        "aarch64-unknown-linux-gnu": ["v8_enable_sandbox"],
-        "aarch64-unknown-linux-musl": ["v8_enable_sandbox"],
-        "x86_64-apple-darwin": ["v8_enable_sandbox"],
-        "x86_64-pc-windows-gnullvm": ["v8_enable_sandbox"],
-        "x86_64-pc-windows-msvc": ["v8_enable_sandbox"],
-        "x86_64-unknown-linux-gnu": ["v8_enable_sandbox"],
-        "x86_64-unknown-linux-musl": ["v8_enable_sandbox"],
-    },
     gen_build_script = "on",
     patch_args = ["-p1"],
     patches = [
         "//patches:rusty_v8_prebuilt_out_dir.patch",
+    ],
+)
+crate.annotation_select(
+    # Keep the Rust feature aligned with the sandbox archive/binding pairs.
+    crate = "v8",
+    crate_features = ["v8_enable_sandbox"],
+    triples = [
+        "aarch64-apple-darwin",
+        "aarch64-pc-windows-gnullvm",
+        "aarch64-pc-windows-msvc",
+        "aarch64-unknown-linux-gnu",
+        "aarch64-unknown-linux-musl",
+        "x86_64-apple-darwin",
+        "x86_64-pc-windows-gnullvm",
+        "x86_64-pc-windows-msvc",
+        "x86_64-unknown-linux-gnu",
+        "x86_64-unknown-linux-musl",
     ],
 )
 
