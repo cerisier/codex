@@ -8,6 +8,7 @@ package(default_visibility = ["//visibility:public"])
 
 exports_files([
     "abseil.BUILD.bazel",
+    "abseil_lifetime_capture.patch",
     "abseil_repository.bzl",
     "artifact_profile.bzl",
     "dependencies.bzl",
