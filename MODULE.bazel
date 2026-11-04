@@ -200,6 +200,7 @@ archive_override(
     integrity = "sha256-uSuiv3XJzyOZWYjDtDBIwp6mIrNU5dg4FVybhjpv2c0=",
     patch_strip = 1,
     patches = [
+        "//patches:rules_rs_bindgen_v0_0_3.patch",
         "//patches:rules_rs_build_script_deps_annotation.patch",
         "//patches:rules_rs_rust_debug_modes.patch",
         "//patches:rules_rs_workspace_package_version.patch",

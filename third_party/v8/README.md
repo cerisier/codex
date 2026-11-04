@@ -134,6 +134,15 @@ and Chromium libc++ profile. The bindings use V8's compiled headers and defines
 so their sizes follow the archive, including CppGC members. Bazel MSVC consumers
 use the newly built archive and bindings together.
 
+Binding generation uses the published hermeticbuild bindgen v0.0.3
+executables through the standard rules_rs toolchain. Their embedded LLVM
+23.1.2 libclang matches the selected LLVM resource headers; Codex does not
+build bindgen or libclang from source.
+
+Binding generation reuses `V8_COPTS`, including native `/std:c++20` on MSVC.
+The clang-cl bindgen action passes toolchain and caller arguments through in CL
+driver mode instead of translating their header-search or warning semantics.
+
 The owned engine policy preserves the GN MSVC defaults for GC-managed microtask
 queues, random Wasm module generation, disabled imminent-deprecation warnings,
 and external TypedArray backing stores. Other source targets retain the published
@@ -153,8 +162,8 @@ bazel build --config=ci-windows-msvc `
   //third_party/v8:rusty_v8_native_windows_binding_for_target
 ```
 
-Bazel fetches and verifies LLVM 22.1.8 for the host, the same major and patch
-version as the libclang that generates bindings. The V8 artifact profile selects
+For native Windows C++ compilation, Bazel fetches and verifies LLVM 22.1.8
+for the host. The V8 artifact profile selects
 clang-cl, lld-link, llvm-lib and compiler-rt only for its Windows MSVC source
 archive and bindings, together with the installed SDK. Bazel consumers now
 cross this same boundary automatically. Other C++
