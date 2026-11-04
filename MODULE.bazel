@@ -9,16 +9,13 @@ bazel_dep(name = "protobuf", version = "34.0.bcr.1", repo_name = "com_google_pro
 bazel_dep(name = "llvm", version = "0.8.11")
 bazel_dep(name = "windows_support", version = "0.2.0")
 
-# Patch hermetic LLVM for Codex's custom libc++ and Windows gnullvm runtime
-# needs that have not landed upstream.
-single_version_override(
+# Merged target-scoped C++ standard-library opt-outs for V8's private libc++.
+# https://github.com/hermeticbuild/hermetic-llvm/pull/903
+archive_override(
     module_name = "llvm",
-    patch_strip = 1,
-    patches = [
-        "//patches:llvm_rusty_v8_custom_libcxx.patch",
-        "//patches:llvm_windows_arm64_powl.patch",
-        "//patches:llvm_windows_mingw_compat.patch",
-    ],
+    integrity = "sha256-d1vS7IfVA4zYrWCynJPSOOGECtP5UYmChWi7aiC2k6c=",
+    strip_prefix = "hermetic-llvm-413655560cc6269a1bf4eaac5100fd96830948bd",
+    urls = ["https://github.com/hermeticbuild/hermetic-llvm/archive/413655560cc6269a1bf4eaac5100fd96830948bd.tar.gz"],
 )
 
 # Preserve case-only SDK aliases when native Windows repository setup feeds
