@@ -1,0 +1,57 @@
+diff --git a/BUILD.bazel b/BUILD.bazel
+--- a/BUILD.bazel
++++ b/BUILD.bazel
+@@ -3,6 +3,11 @@
+ 
+ package(default_visibility = ["//visibility:public"])
+ 
++exports_files([
++    "sqlite3.c",
++    "sqlite3_library.bzl",
++])
++
+ cc_binary(
+     name = "shell",
+     srcs = ["shell.c"],
+@@ -37,3 +42,9 @@
+     name = "sqlite3ext",
+     hdrs = ["sqlite3ext.h"],
+ )
++
++cc_library(
++    name = "sqlite3_headers",
++    hdrs = ["sqlite3.h"],
++    includes = ["."],
++)
+diff --git a/sqlite3_library.bzl b/sqlite3_library.bzl
+new file mode 100644
+--- /dev/null
++++ b/sqlite3_library.bzl
+@@ -0,0 +1,27 @@
++"""Build SQLite with consumer-selected compilation options."""
++
++load("@rules_cc//cc:cc_library.bzl", "cc_library")
++
++def sqlite3_library(name, deps = [], linkopts = [], **kwargs):
++    """Builds the pinned amalgamation without imposing a SQLite feature profile.
++
++    Args:
++        name: Library target name.
++        deps: Additional dependencies.
++        linkopts: Additional linker options.
++        **kwargs: cc_library attributes, including local_defines and copts.
++    """
++    cc_library(
++        name = name,
++        srcs = [Label("//:sqlite3.c")],
++        deps = [Label("//:sqlite3_headers")] + deps,
++        # Some Unix platforms have pthread and/or dlopen in separate libraries.
++        linkopts = select({
++            Label("@platforms//os:freebsd"): ["-lpthread"],
++            Label("@platforms//os:linux"): ["-lpthread", "-ldl"],
++            Label("@platforms//os:netbsd"): ["-lpthread"],
++            Label("@platforms//os:openbsd"): ["-lpthread"],
++            "//conditions:default": [],
++        }) + linkopts,
++        **kwargs
++    )

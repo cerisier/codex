@@ -1,0 +1,59 @@
+load("@bazel_lib//lib:copy_to_directory.bzl", "copy_to_directory")
+load("@sqlite3//:sqlite3_library.bzl", "sqlite3_library")
+load("sqlite_build_info.bzl", "sqlite_build_info")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files([
+    "libsqlite3_sys.BUILD.bazel",
+])
+
+# Upstream's bundled bindings use portable core::ffi types. They expose the
+# 3.51.3 API subset; the native BCR library is 3.53.4. Query sqlite3_libversion()
+# for the runtime version, not the bindings' SQLITE_VERSION constant.
+copy_to_directory(
+    name = "sqlite_bindings",
+    srcs = ["@crates//:libsqlite3_sys_bindings"],
+    include_external_repositories = ["*"],
+    replace_prefixes = {"sqlite3/bindgen_bundled_version.rs": "bindgen.rs"},
+)
+
+sqlite_build_info(
+    name = "libsqlite3_sys_build_info",
+    cc_lib = "sqlite3",
+    out_dir = "sqlite_bindings",
+)
+
+# Match libsqlite3-sys 0.37.0's bundled build, without running build.rs.
+# Internal compilation options must not leak into dependent C/C++ targets.
+sqlite3_library(
+    name = "sqlite3",
+    local_defines = [
+        "SQLITE_CORE",
+        "SQLITE_DEFAULT_FOREIGN_KEYS=1",
+        "SQLITE_ENABLE_API_ARMOR",
+        "SQLITE_ENABLE_COLUMN_METADATA",
+        "SQLITE_ENABLE_DBSTAT_VTAB",
+        "SQLITE_ENABLE_FTS3",
+        "SQLITE_ENABLE_FTS3_PARENTHESIS",
+        "SQLITE_ENABLE_FTS5",
+        "SQLITE_ENABLE_JSON1",
+        "SQLITE_ENABLE_LOAD_EXTENSION=1",
+        "SQLITE_ENABLE_MEMORY_MANAGEMENT",
+        "SQLITE_ENABLE_RTREE",
+        "SQLITE_ENABLE_STAT4",
+        "SQLITE_SOUNDEX",
+        "SQLITE_THREADSAFE=1",
+        "SQLITE_USE_URI",
+        "HAVE_USLEEP=1",
+        "HAVE_ISNAN",
+        "_POSIX_THREAD_SAFE_FUNCTIONS",
+    ] + select({
+        "@platforms//os:windows": [],
+        "//conditions:default": ["HAVE_LOCALTIME_R"],
+    }) + select({
+        # Preserve Codex's workaround for older x64 Windows CPUs.
+        "@rules_rs//rs/platforms/config:x86_64-pc-windows-msvc": ["SQLITE_DISABLE_INTRINSIC"],
+        "//conditions:default": [],
+    }),
+)

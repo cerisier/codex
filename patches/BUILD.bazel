@@ -1,4 +1,5 @@
 exports_files([
+    "sqlite3_configurable_library.patch",
     "rules_rust_declared_msvc_linker.patch",
     "rules_rs_bindgen_v0_0_3.patch",
     "abseil_windows_gnullvm_thread_identity.patch",
