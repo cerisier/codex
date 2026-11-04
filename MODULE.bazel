@@ -380,6 +380,11 @@ crate.from_cargo(
 bazel_dep(name = "zstd", version = "1.5.7.bcr.2")
 
 crate.annotation(
+    # Debug builds must also embed assets instead of reading the worker's source tree.
+    crate = "rust-embed",
+    crate_features = ["debug-embed"],
+)
+crate.annotation(
     # Keep Windows proxy authentication aligned with codex-rs/.cargo/config.toml.
     build_script_env = {"CFLAGS": "-DCURL_ENABLE_NTLM"},
     crate = "curl-sys",
