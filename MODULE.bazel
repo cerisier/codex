@@ -383,6 +383,7 @@ crate.annotation_select(
     crate_features = ["pure"],
     triples = [
         "x86_64-pc-windows-gnullvm",
+        "x86_64-pc-windows-msvc",
     ],
 )
 
