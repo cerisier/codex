@@ -308,11 +308,10 @@ alias(
 
 filegroup(
     name = "windows_x64_stack_assembly",
-    # The import preserves upstream MASM; only GNU builds use our GAS source.
-    srcs = select({
-        "@@//third_party/v8:platform_windows_msvc": ["src/heap/base/asm/x64/push_registers_masm.asm"],
-        "//conditions:default": ["@@//third_party/v8:push_registers_gnullvm.S"],
-    }),
+    # Windows x64 ABI and SEH metadata, assembled by @llvm's integrated assembler.
+    # The existing GAS translation matches the pinned MASM scanner instruction
+    # for instruction; its syntax is not a dependency on the GNU Windows ABI.
+    srcs = ["@@//third_party/v8:push_registers_gnullvm.S"],
 )
 
 alias(
