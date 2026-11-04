@@ -158,6 +158,28 @@ tools retain their default C++ runtime. V8's own generator binaries explicitly
 reapply the private-runtime policy after the execution transition. Neither flag
 suppresses C headers, the SDK, CRT, compiler-rt, or the independent unwinder.
 
+Build with Linux remote execution and the static CRT:
+
+```sh
+bazel build --config=buildbuddy-generic-rbe --host_platform=//:rbe \
+  --platforms=@llvm//platforms:windows_x86_64_msvc \
+  --extra_execution_platforms=//:rbe,//bazel/platforms:linux_x86_64_rbe \
+  --repo_env=BAZEL_MSVC_RUNTIME_VISUAL_STUDIO_EULA=1 \
+  --repo_env=BAZEL_WINDOWS_SDK_EULA=1 \
+  --features=-dynamic_link_msvcrt --features=static_link_msvcrt \
+  --features=cargo-rebase-json-vfs-overlays \
+  //third_party/v8:rusty_v8_native_windows_archive_for_target \
+  //third_party/v8:rusty_v8_native_windows_binding_for_target
+```
+
+Torque and other ordinary generators execute on Linux. The Windows snapshot
+generator is instead a Windows x64 payload compiled with the same `@llvm`
+toolchain, executed by declared Wine on an x64 Linux remote worker. This keeps
+V8's Windows-host unwind writer enabled, including generated `.pdata`/`.xdata`.
+No installed Visual Studio or ambient Windows toolchain is used. ARM64 uses
+V8's x64-hosted ARM64 generator. Select `@llvm//platforms:windows_aarch64_msvc`
+for an ARM64 build.
+
 Release and CI Cargo builds for Darwin and Linux use `RUSTY_V8_ARCHIVE` plus a
 downloaded `RUSTY_V8_SRC_BINDING_PATH` to point at those `openai/codex` release
 assets directly. We do not use `RUSTY_V8_MIRROR` because the upstream `v8` crate
