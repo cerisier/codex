@@ -1,5 +1,6 @@
 exports_files([
     "opusic_sys_install_headers.patch",
+    "rules_rust_declared_msvc_linker.patch",
     "abseil_windows_gnullvm_thread_identity.patch",
     "bzip2_windows_stack_args.patch",
     "mxc-sdk_utf8_resources.patch",
