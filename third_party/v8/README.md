@@ -134,7 +134,7 @@ and Chromium libc++ profile. The bindings use V8's compiled headers and defines
 so their sizes follow the archive, including CppGC members. Bazel MSVC consumers
 use the newly built archive and bindings together.
 
-Binding generation uses the published hermeticbuild bindgen v0.0.3
+Binding generation uses the published hermeticbuild bindgen v0.0.4
 executables through the standard rules_rs toolchain. Their embedded LLVM
 23.1.2 libclang matches the selected LLVM resource headers; Codex does not
 build bindgen or libclang from source.
