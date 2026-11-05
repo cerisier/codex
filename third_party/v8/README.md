@@ -163,7 +163,7 @@ Build with Linux remote execution and the static CRT:
 ```sh
 bazel build --config=buildbuddy-generic-rbe --host_platform=//:rbe \
   --platforms=@llvm//platforms:windows_x86_64_msvc \
-  --extra_execution_platforms=//:rbe,//bazel/platforms:linux_x86_64_rbe \
+  --extra_execution_platforms=//:rbe \
   --repo_env=BAZEL_MSVC_RUNTIME_VISUAL_STUDIO_EULA=1 \
   --repo_env=BAZEL_WINDOWS_SDK_EULA=1 \
   --features=-dynamic_link_msvcrt --features=static_link_msvcrt \
@@ -172,13 +172,18 @@ bazel build --config=buildbuddy-generic-rbe --host_platform=//:rbe \
   //third_party/v8:rusty_v8_native_windows_binding_for_target
 ```
 
-Torque and other ordinary generators execute on Linux. The Windows snapshot
-generator is instead a Windows x64 payload compiled with the same `@llvm`
-toolchain, executed by declared Wine on an x64 Linux remote worker. This keeps
-V8's Windows-host unwind writer enabled, including generated `.pdata`/`.xdata`.
-No installed Visual Studio or ambient Windows toolchain is used. ARM64 uses
-V8's x64-hosted ARM64 generator. Select `@llvm//platforms:windows_aarch64_msvc`
-for an ARM64 build.
+Torque and other ordinary generators execute on Linux. The MSVC snapshot
+generator is a Windows payload compiled with the same `@llvm` toolchain.
+`rules_wine` selects direct execution on Windows or its pinned Wine runtime on
+Linux. Linux ARM64 workers use the runtime's bundled FEX to run the x64 generator;
+both x64 and ARM64 targets use the existing `//:rbe` platform. This keeps V8's
+Windows-host unwind writer enabled, including generated `.pdata`/`.xdata`.
+Select `@llvm//platforms:windows_aarch64_msvc` for an ARM64 build.
+
+Native Windows ARM64 uses an ARM64 generator for ARM64 snapshots. Other MSVC
+combinations use the x64 generator, including V8's x64-hosted ARM64 generator.
+The existing GNU snapshot action and its Windows-local CI execution remain
+unchanged. The existing MSVC assembly-to-C++ conversion is also retained.
 
 Release and CI Cargo builds for Darwin and Linux use `RUSTY_V8_ARCHIVE` plus a
 downloaded `RUSTY_V8_SRC_BINDING_PATH` to point at those `openai/codex` release

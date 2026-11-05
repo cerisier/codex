@@ -558,6 +558,14 @@ new_local_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:local.
 
 include("//bazel/modules:wine.MODULE.bazel")
 
+# Run V8's Windows snapshot generator natively or with the executor's Wine.
+bazel_dep(name = "rules_wine", version = "0.1.3")
+
+wine = use_extension("@rules_wine//wine/extension:wine.bzl", "wine")
+use_repo(wine, "wine_toolchains")
+
+register_toolchains("@wine_toolchains//:all")
+
 voice_sources = use_extension("//third_party/voice:extensions.bzl", "voice_sources")
 use_repo(
     voice_sources,
