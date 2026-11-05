@@ -29,7 +29,7 @@ def _artifact_profile_impl(settings, attr):
         # Windows snapshot generators run under Wine on Linux.
         _TARGET_OS: attr.target_os,
         _MSVC_PROFILE: attr.native_windows,
-        _NOSTDINCXX: True if attr.native_windows and attr.profile != "source" else settings[_NOSTDINCXX],
+        _NOSTDINCXX: True if attr.profile != "source" else settings[_NOSTDINCXX],
         _NOSTDLIBXX: True if attr.native_windows and attr.profile != "source" else settings[_NOSTDLIBXX],
     }
 

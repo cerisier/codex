@@ -151,9 +151,9 @@ bindings use that same threshold; never pair a native 64-byte threshold with
 GN's size-zero binding constant. These are fixed platform choices, not additional
 developer build switches.
 
-The V8 Windows profile sets `@llvm//config:nostdincxx` and
-`@llvm//config:nostdlibxx`, then explicitly supplies Chromium's pinned libc++
-headers and archive. These settings are target-scoped: unrelated execution
+Private libc++ profiles set `@llvm//config:nostdincxx` and explicitly supply
+Chromium's pinned libc++ headers and archive. The Windows MSVC profile also
+sets `@llvm//config:nostdlibxx`. These settings are target-scoped: unrelated execution
 tools retain their default C++ runtime. V8's own generator binaries explicitly
 reapply the private-runtime policy after the execution transition. Neither flag
 suppresses C headers, the SDK, CRT, compiler-rt, or the independent unwinder.
