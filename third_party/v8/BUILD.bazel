@@ -25,7 +25,6 @@ exports_files([
     "libcxx_rules.bzl",
     "native_windows.bzl",
     "windows_snapshot.bzl",
-    "windows_snapshot.sh",
     "v8_windows_snapshot_wine.patch",
     "push_registers_gnullvm.S",
     "simdutf.BUILD.bazel",

@@ -1,5 +1,3 @@
-diff --git a/orig/v8-15.2.124.1/bazel/defs.bzl b/mod/v8-15.2.124.1/bazel/defs.bzl
-index f41199d..6ab9031 100644
 --- a/orig/v8-15.2.124.1/bazel/defs.bzl
 +++ b/mod/v8-15.2.124.1/bazel/defs.bzl
 @@ -6,6 +6,7 @@
@@ -10,16 +8,15 @@ index f41199d..6ab9031 100644
  load("@rules_cc//cc:cc_library.bzl", "cc_library")
  load("@@//third_party/v8:binary.bzl", cc_binary = "v8_cc_binary")
  load("@rules_cc//cc/common:cc_common.bzl", "cc_common")
-@@ -560,8 +561,41 @@ _v8_mksnapshot = rule(
+@@ -586,8 +587,41 @@
      cfg = v8_target_cpu_transition,
  )
  
--def v8_mksnapshot(name, args, suffix = ""):
 +
 +_v8_windows_mksnapshot = windows_snapshot_rule(v8_target_cpu_transition)
 +
 +def _platform_mksnapshot(name, args, tool, **kwargs):
-     _v8_mksnapshot(
++    _v8_mksnapshot(
 +        name = name + "_native",
 +        args = args,
 +        tool = tool,
@@ -33,11 +30,11 @@ index f41199d..6ab9031 100644
 +        name = name + "_windows",
 +        args = args,
 +        tool = tool,
++        inline_asm_converter = kwargs["inline_asm_converter"],
 +        target_arch = select({
 +            "@v8//bazel/config:v8_target_arm64": "arm64",
 +            "@v8//bazel/config:v8_target_x64": "x64",
 +        }),
-+        exec_compatible_with = ["@platforms//os:linux", "@platforms//cpu:x86_64"],
 +        target_compatible_with = ["@platforms//os:windows", "@llvm//constraints/windows/abi:msvc"],
 +    )
 +    native.alias(
@@ -48,12 +45,13 @@ index f41199d..6ab9031 100644
 +        }),
 +    )
 +
-+def v8_mksnapshot(name, args, suffix = ""):
+ def v8_mksnapshot(name, args, suffix = ""):
+-    _v8_mksnapshot(
 +    _platform_mksnapshot(
          name = "noicu/" + name,
          args = args,
          prefix = "noicu",
-@@ -573,7 +607,7 @@ def v8_mksnapshot(name, args, suffix = ""):
+@@ -604,7 +638,7 @@
              "//conditions:default": "",
          }),
      )
