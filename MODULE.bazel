@@ -208,7 +208,7 @@ use_repo(foreign_cc_tools, "cmake-3.31.8-windows-x86_64", "pkgconfig_src")
 
 archive_override(
     module_name = "rules_rs",
-    integrity = "sha256-uSuiv3XJzyOZWYjDtDBIwp6mIrNU5dg4FVybhjpv2c0=",
+    integrity = "sha256-b8sUj9EvM72+so/q4uRH91ed7QwOO8EoGbdL8NyBjE4=",
     patch_strip = 1,
     patches = [
         "//patches:rules_rs_bindgen_v0_0_4.patch",
@@ -216,8 +216,8 @@ archive_override(
         "//patches:rules_rs_rust_debug_modes.patch",
         "//patches:rules_rs_workspace_package_version.patch",
     ],
-    strip_prefix = "rules_rs-97157ddbff0dd427e33a02910d035f724e2dfe37",
-    urls = ["https://github.com/hermeticbuild/rules_rs/archive/97157ddbff0dd427e33a02910d035f724e2dfe37.tar.gz"],
+    strip_prefix = "rules_rs-7a05511772a8a85db5382ff7536bf2f1e6a8dde3",
+    urls = ["https://github.com/hermeticbuild/rules_rs/archive/7a05511772a8a85db5382ff7536bf2f1e6a8dde3.tar.gz"],
 )
 
 rules_rust = use_extension("@rules_rs//rs:rules_rust.bzl", "rules_rust")
