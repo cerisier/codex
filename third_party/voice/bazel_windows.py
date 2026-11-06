@@ -165,6 +165,11 @@ def main():
                 log = builder.output / (builder.record["steps"][-1]["name"] + ".log")
                 if log.is_file():
                     print(log.read_text(errors="replace"), file=sys.stderr)
+            # Fork-only diagnosis: TemporaryDirectory removes the evidence on
+            # exit. Preserve compiler probes in the action log before cleanup.
+            for log in sorted(builder.output.rglob("config.log")):
+                print(f"\n=== {log.relative_to(builder.output)} ===", file=sys.stderr)
+                print(log.read_text(errors="replace"), file=sys.stderr)
             raise
         with tarfile.open(root / config["prefix"], "w") as archive:
             archive.add(builder.prefix, arcname=".")
