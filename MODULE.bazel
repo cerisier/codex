@@ -200,7 +200,9 @@ use_repo(pip, "schema_python")
 register_toolchains("@rules_foreign_cc//toolchains:built_make_toolchain")
 
 foreign_cc_tools = use_extension("@rules_foreign_cc//foreign_cc:extensions.bzl", "tools")
-use_repo(foreign_cc_tools, "cmake-3.31.8-windows-x86_64", "pkgconfig_src")
+use_repo(foreign_cc_tools, "cmake-3.31.8-windows-x86_64", "ninja_1.13.0_win", "pkgconfig_src")
+
+register_toolchains("//third_party/voice:windows_ninja_toolchain")
 
 archive_override(
     module_name = "rules_rs",
