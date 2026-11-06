@@ -88,7 +88,10 @@ def cargo():
     destination = Path(environment["CODEX_TEST_VOICE_RUNTIME"]) / "bin/codex-voice-host"
     destination.parent.mkdir(exist_ok=True)
     for name, executable in binaries.items():
-        shutil.copy2(executable, destination)
+        shutil.copyfile(executable, destination)
+        # The test copies this source tree, then installs the selected helper
+        # over its copy. Do not propagate Bazel's read-only output permissions.
+        destination.chmod(0o755)
         environment["CARGO_BIN_EXE_codex-voice-host"] = str(destination)
         result |= run(name + "-identity", [str(destination), "--build-commit"], env=environment)
         result |= run(name + "-relocated-runtime", [test, "--ignored", "--exact", TEST, "--nocapture"], env=environment)
