@@ -86,9 +86,9 @@ def build(helper=False):
             "--extra_toolchains=@local_config_cc//:cc-toolchain-x64_windows,@local_config_cc//:cc-toolchain-arm64_windows",
         ]
     else:
-        # Diagnostic only: the baseline bootstrap Rust action omitted the
-        # toolchain's static CRT flag while LLVM exposed only static libraries.
-        flags += ["--@rules_rust//rust/settings:extra_exec_rustc_flag=-Ctarget-feature=+crt-static"]
+        # Diagnostic only: the root registration still names //:all, but this
+        # rules_rs revision declares the configured Rust toolchains in //rustc.
+        flags += ["--extra_toolchains=@default_rust_toolchains//rustc:all"]
     for name in ("SystemRoot", "PROCESSOR_ARCHITECTURE"):
         flags += [f"--action_env={name}={os.environ[name]}", f"--host_action_env={name}={os.environ[name]}"]
 
