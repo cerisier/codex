@@ -85,11 +85,28 @@ def build(helper=False):
             "--repo_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=0",
             "--extra_toolchains=@local_config_cc//:cc-toolchain-x64_windows,@local_config_cc//:cc-toolchain-arm64_windows",
         ]
+    else:
+        # Diagnostic only: the baseline bootstrap Rust action omitted the
+        # toolchain's static CRT flag while LLVM exposed only static libraries.
+        flags += ["--@rules_rust//rust/settings:extra_exec_rustc_flag=-Ctarget-feature=+crt-static"]
     for name in ("SystemRoot", "PROCESSOR_ARCHITECTURE"):
         flags += [f"--action_env={name}={os.environ[name]}", f"--host_action_env={name}={os.environ[name]}"]
 
     if helper:
         result = run("helper-build", startup + ["build"] + flags + [HELPER])
+        binary = Path("bazel-bin/codex-rs/voice-host/codex-voice-host.exe")
+        if binary.exists():
+            # Preserve path evidence even if the post-link hermeticity check
+            # rejects an otherwise successfully linked executable.
+            data = binary.read_bytes()
+            import re
+            paths = []
+            for pattern in (rb"[\x20-\x7e]{12,}", rb"(?:[\x20-\x7e]\x00){12,}"):
+                for match in re.finditer(pattern, data):
+                    value = match.group().decode("utf-16-le" if b"\x00" in match.group() else "ascii")
+                    if "execroot" in value.lower():
+                        paths.append(value)
+            (EVIDENCE / "helper-embedded-paths.json").write_text(json.dumps(paths, indent=2))
         if result:
             return result
         binary = Path("bazel-bin/codex-rs/voice-host/codex-voice-host.exe").resolve(strict=True)
@@ -111,6 +128,9 @@ def build(helper=False):
     result = run("native-build", startup + ["build"] + flags + [
         "--output_groups=default,sdk", RUNTIME,
     ])
+    for source in Path("C:/v/o/external").glob("*/rustc/BUILD.bazel"):
+        if "declare_rustc_toolchains" in source.read_text(errors="replace"):
+            shutil.copy2(source, EVIDENCE / (source.parent.parent.name + "-rustc.BUILD.txt"))
     outputs = Path("bazel-bin/third_party/voice")
     if outputs.exists():
         for source in outputs.glob("native_*windows_x86_64*.json"):
