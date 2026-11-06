@@ -23,6 +23,10 @@ jobs:
         with:
           target: x86_64-pc-windows-gnullvm
           cache-scope: gnullvm-diagnostic
+      - name: Prepare native Windows audio dependencies as in the existing GNU job
+        uses: ./third_party/voice/cargo-ci/windows-setup
+        with:
+          target: x86_64-pc-windows-msvc
       - name: Build the GNULVM CLI and V8 host
         shell: bash
         run: |
