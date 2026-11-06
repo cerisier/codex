@@ -77,10 +77,9 @@ fn sandbox_cwd() -> PathBuf {
         return PathBuf::from(workspace_root);
     }
 
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .expect("repo root")
-        .to_path_buf()
+    codex_utils_cargo_bin::repo_root()
+        .expect("resolve repository root")
+        .join("codex-rs")
 }
 
 fn sandbox_home(name: &str) -> TempDir {
