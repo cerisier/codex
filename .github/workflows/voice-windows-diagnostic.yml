@@ -35,6 +35,8 @@ jobs:
           New-Item -ItemType Directory -Force C:/v/tmp | Out-Null
           'TEMP=C:/v/tmp' >> $env:GITHUB_ENV
           'TMP=C:/v/tmp' >> $env:GITHUB_ENV
+          git config --global core.longpaths true
+          'CARGO_HOME=C:/v/cargo-home' >> $env:GITHUB_ENV
       - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         with:
           python-version: '3.12'
