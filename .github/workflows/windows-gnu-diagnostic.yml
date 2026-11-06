@@ -1,0 +1,52 @@
+name: Windows GNULVM diagnostic
+
+on:
+  push:
+    branches: [codex/voice-windows-diagnostic]
+    paths: [.github/workflows/windows-gnu-diagnostic.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native:
+    if: github.repository == 'cerisier/codex'
+    runs-on: windows-2025
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: 6771e8fe0bf1652fd5c860d99a2903a90c78ca47
+          persist-credentials: false
+      - uses: ./.github/actions/prepare-bazel-ci
+        with:
+          target: x86_64-pc-windows-gnullvm
+          cache-scope: gnullvm-diagnostic
+      - name: Build the GNULVM CLI and V8 host
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./.github/scripts/run-bazel-ci.sh \
+            --print-failed-action-summary --remote-download-toplevel \
+            --windows-msvc-host-platform -- \
+            build --platforms=//:windows_x86_64_gnullvm \
+            --jobs=4 --local_resources=memory=6000 \
+            --build_metadata=COMMIT_SHA=6771e8fe0bf1652fd5c860d99a2903a90c78ca47 -- \
+            //codex-rs/cli:codex //codex-rs/code-mode-host:codex-code-mode-host
+      - name: Run the GNULVM CLI without user configuration
+        shell: pwsh
+        run: |
+          $env:CODEX_HOME = Join-Path $env:RUNNER_TEMP 'gnu-codex-home'
+          New-Item -ItemType Directory -Force $env:CODEX_HOME | Out-Null
+          & .\bazel-bin\codex-rs\cli\codex.exe --version
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Upload build evidence
+        if: always()
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: windows-gnullvm-evidence
+          path: |
+            bazel-execution-log*
+            bazel-build-event*
+          if-no-files-found: ignore
