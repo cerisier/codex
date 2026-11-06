@@ -44,7 +44,12 @@ v8_string(
         name = "v8_target_os_" + os,
         flag_values = {":v8_target_os": os},
     )
-    for os in ["android", "linux", "mac", "win"]
+    for os in [
+        "android",
+        "linux",
+        "mac",
+        "win",
+    ]
 ]
 
 # Maglev is supported on the two architectures shipped by Codex. Keep the
