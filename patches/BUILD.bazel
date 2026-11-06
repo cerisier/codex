@@ -1,5 +1,6 @@
 exports_files([
     "opusic_sys_install_headers.patch",
+    "opusic-sys_presume_neon.patch",
     "sqlite3_configurable_library.patch",
     "rules_rust_declared_msvc_linker.patch",
     "rules_rs_bindgen_v0_0_4.patch",
