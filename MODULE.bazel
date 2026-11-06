@@ -23,11 +23,13 @@ bazel_dep(name = "with_cfg.bzl", version = "0.12.0")
 
 # Merged target-scoped C++ standard-library opt-outs for V8's private libc++.
 # https://github.com/hermeticbuild/hermetic-llvm/pull/903
+# Includes explicit MSVC CRT startup-library selection for dependency-provided main.
+# https://github.com/hermeticbuild/hermetic-llvm/pull/914
 archive_override(
     module_name = "llvm",
-    integrity = "sha256-d1vS7IfVA4zYrWCynJPSOOGECtP5UYmChWi7aiC2k6c=",
-    strip_prefix = "hermetic-llvm-413655560cc6269a1bf4eaac5100fd96830948bd",
-    urls = ["https://github.com/hermeticbuild/hermetic-llvm/archive/413655560cc6269a1bf4eaac5100fd96830948bd.tar.gz"],
+    integrity = "sha256-KTjljFEA8dmXkOoVz6Wv3yqkMfqrbS5iDv/ef4GYsu0=",
+    strip_prefix = "hermetic-llvm-d27493f0386c9d4d28f7b12630cb91b0cdfd20f1",
+    urls = ["https://github.com/hermeticbuild/hermetic-llvm/archive/d27493f0386c9d4d28f7b12630cb91b0cdfd20f1.tar.gz"],
 )
 
 # Preserve case-only SDK aliases when native Windows repository setup feeds
