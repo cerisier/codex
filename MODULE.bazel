@@ -9,6 +9,14 @@ bazel_dep(name = "package_metadata", version = "0.0.7")
 
 # Expose the public protobuf rules already used transitively by rules_rs.
 bazel_dep(name = "protobuf", version = "34.0.bcr.1", repo_name = "com_google_protobuf")
+
+# Backport protobuf#31266 (849e1cbf91af): MSVC also needs the ARM64 SEH workaround.
+single_version_override(
+    module_name = "protobuf",
+    patch_strip = 1,
+    patches = ["//patches:protobuf_windows_arm64_seh.patch"],
+)
+
 bazel_dep(name = "llvm", version = "0.8.11")
 bazel_dep(name = "windows_support", version = "0.2.0")
 bazel_dep(name = "with_cfg.bzl", version = "0.12.0")

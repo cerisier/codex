@@ -1,4 +1,5 @@
 exports_files([
+    "protobuf_windows_arm64_seh.patch",
     "opusic-sys_presume_neon.patch",
     "sqlite3_configurable_library.patch",
     "rules_rust_declared_msvc_linker.patch",
