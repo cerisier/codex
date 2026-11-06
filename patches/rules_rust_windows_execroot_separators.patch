@@ -26,7 +26,7 @@
      }
  
      /// Redact for env vars: uses the generic `${out_dir}` token, resolved
-@@ -736,6 +745,28 @@
+@@ -736,6 +745,26 @@
                  cdylib_link_flags: "".to_owned(),
                  bin_link_flags: "".to_owned(),
              }
@@ -36,7 +36,8 @@
 +    #[cfg(windows)]
 +    #[test]
 +    fn windows_include_metadata_redacts_both_root_spellings() {
-+        let root = r"D:\o\execroot\_main";
++        let directory = std::env::current_dir().unwrap();
++        let root = directory.to_str().unwrap();
 +        let forward = root.replace('\\', "/");
 +        let outputs = vec![BuildScriptOutput::DepEnv(format!(
 +            "INCLUDE={forward}/include;{root}\\lib;{forward}-other/include"
@@ -45,12 +46,9 @@
 +            BuildScriptOutput::outputs_to_dep_env(&outputs, "glib", root),
 +            format!("DEP_GLIB_INCLUDE=${{pwd}}/include;${{pwd}}\\lib;{forward}-other/include")
 +        );
-+        let directory = std::env::current_dir().unwrap();
-+        let directory = directory.to_str().unwrap();
-+        let forward = directory.replace('\\', "/");
 +        let outputs = vec![BuildScriptOutput::DepEnv(format!("INCLUDE={forward}/."))];
 +        assert_eq!(
-+            BuildScriptOutput::nonhermetic_absolute_paths(&outputs, directory, ""),
++            BuildScriptOutput::nonhermetic_absolute_paths(&outputs, root, ""),
 +            Vec::<String>::new()
          );
      }
