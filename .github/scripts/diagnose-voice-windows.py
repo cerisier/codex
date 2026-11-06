@@ -1,6 +1,7 @@
 """Fork-only comparison; do not modify the production voice build recipe."""
 
 import json
+import hashlib
 import os
 from pathlib import Path
 import shutil
@@ -13,6 +14,25 @@ EVIDENCE = Path("voice-diagnostic")
 MODE = os.environ["DIAGNOSTIC_MODE"]
 RUNTIME = "//third_party/voice:native_runtime_windows_x86_64"
 HELPER = "//codex-rs/voice-host:codex-voice-host"
+TEST = "relocated_runtime_initializes_closes_and_rejects_duplicate_initialization"
+
+
+def run(name, command, quiet=False, **kwargs):
+    (EVIDENCE / (name + ".command.json")).write_text(json.dumps(command, indent=2))
+    with (EVIDENCE / (name + ".log")).open("w", encoding="utf-8") as output:
+        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                   text=True, encoding="utf-8", errors="replace", **kwargs)
+        for line in process.stdout:
+            output.write(line)
+            output.flush()
+            if not quiet:
+                print(line, end="", flush=True)
+        code = process.wait()
+    result_file = EVIDENCE / "results.json"
+    results = json.loads(result_file.read_text()) if result_file.exists() else {}
+    results[name] = code
+    result_file.write_text(json.dumps(results, indent=2))
+    return code
 
 
 def configure():
@@ -45,7 +65,7 @@ def configure():
     }, indent=2))
 
 
-def build():
+def build(helper=False):
     bazel = shutil.which("bazel")
     if not bazel:
         raise RuntimeError("Bazel is unavailable")
@@ -68,21 +88,16 @@ def build():
     for name in ("SystemRoot", "PROCESSOR_ARCHITECTURE"):
         flags += [f"--action_env={name}={os.environ[name]}", f"--host_action_env={name}={os.environ[name]}"]
 
-    results = {}
-
-    def run(name, command, quiet=False):
-        (EVIDENCE / (name + ".command.json")).write_text(json.dumps(command, indent=2))
-        with (EVIDENCE / (name + ".log")).open("w", encoding="utf-8") as output:
-            process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                       text=True, encoding="utf-8", errors="replace")
-            for line in process.stdout:
-                output.write(line)
-                output.flush()
-                if not quiet:
-                    print(line, end="", flush=True)
-            results[name] = process.wait()
-        (EVIDENCE / "results.json").write_text(json.dumps(results, indent=2))
-        return results[name]
+    if helper:
+        result = run("helper-build", startup + ["build"] + flags + [HELPER])
+        if result:
+            return result
+        binary = Path("bazel-bin/codex-rs/voice-host/codex-voice-host.exe").resolve(strict=True)
+        inspect_binary("bazel-helper", binary)
+        environment = dict(os.environ)
+        runtime_bin = Path("bazel-bin/third_party/voice/native_runtime_windows_x86_64/bin").resolve(strict=True)
+        environment["PATH"] = str(runtime_bin) + os.pathsep + environment["PATH"]
+        return run("bazel-helper-identity", [str(binary), "--build-commit"], env=environment)
 
     # Analyze the larger helper graph separately: an analysis failure should not
     # prevent testing whether the standalone SDK producer works.
@@ -100,9 +115,54 @@ def build():
     if outputs.exists():
         for source in outputs.glob("native_*windows_x86_64*.json"):
             shutil.copy2(source, EVIDENCE / source.name)
-    if result == 0:
-        print("Native SDK/runtime build passed; Cargo linkage and runtime execution remain untested.")
-    return result or int(any(results.values()))
+        for name in ("runtime.json", "sdk.json"):
+            directory = "native_runtime_windows_x86_64" + ("_sdk" if name == "sdk.json" else "")
+            source = outputs / directory / name
+            if source.exists():
+                shutil.copy2(source, EVIDENCE / name)
+    return result
+
+
+def inspect_binary(name, binary):
+    (EVIDENCE / (name + ".sha256")).write_text(hashlib.sha256(binary.read_bytes()).hexdigest() + "\n")
+    dumpbin = shutil.which("dumpbin")
+    if not dumpbin:
+        raise RuntimeError("MSVC dumpbin is unavailable")
+    if run(name + "-pe", [dumpbin, "/headers", "/imports", str(binary)], quiet=True):
+        raise RuntimeError("PE inspection failed")
+
+
+def cargo():
+    # The integration test also builds the real binary. Compile once, then use
+    # that same existing test to exercise the Cargo and Bazel executables.
+    command = ["cargo", "test", "--release", "--locked", "-p", "codex-voice-host",
+               "--target", "x86_64-pc-windows-msvc", "--test", "packaged_runtime",
+               "--no-run", "--message-format=json"]
+    result = run("cargo-build", command, cwd="codex-rs")
+    if result:
+        return result
+    artifacts = []
+    for line in (EVIDENCE / "cargo-build.log").read_text().splitlines():
+        try:
+            message = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if message.get("reason") == "compiler-artifact" and message.get("executable"):
+            artifacts.append(message)
+    test = next(Path(a["executable"]) for a in artifacts if a["target"]["name"] == "packaged_runtime")
+    binary = next(Path(a["executable"]) for a in artifacts if a["target"]["name"] == "codex-voice-host")
+    inspect_binary("cargo-helper", binary)
+    environment = dict(os.environ)
+    environment["PATH"] = str(Path(environment["CODEX_TEST_VOICE_RUNTIME"]) / "bin") + os.pathsep + environment["PATH"]
+    result = run("cargo-helper-identity", [str(binary), "--build-commit"], env=environment)
+    binaries = {"cargo": binary}
+    bazel_binary = Path("bazel-bin/codex-rs/voice-host/codex-voice-host.exe")
+    if bazel_binary.exists():
+        binaries["bazel"] = bazel_binary.resolve(strict=True)
+    for name, executable in binaries.items():
+        environment["CARGO_BIN_EXE_codex-voice-host"] = str(executable)
+        result |= run(name + "-relocated-runtime", [str(test), "--ignored", "--exact", TEST, "--nocapture"], env=environment)
+    return result
 
 
 if __name__ == "__main__":
@@ -110,5 +170,9 @@ if __name__ == "__main__":
         configure()
     elif sys.argv[1:] == ["build"]:
         sys.exit(build())
+    elif sys.argv[1:] == ["helper"]:
+        sys.exit(build(helper=True))
+    elif sys.argv[1:] == ["cargo"]:
+        sys.exit(cargo())
     else:
-        raise SystemExit("Expected configure or build")
+        raise SystemExit("Expected configure, build, helper or cargo")

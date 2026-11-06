@@ -16,11 +16,11 @@ jobs:
   native:
     if: github.repository == 'cerisier/codex'
     runs-on: windows-2025
-    timeout-minutes: 100
+    timeout-minutes: 180
     strategy:
       fail-fast: false
       matrix:
-        mode: [current, before-removal, restored-msvc]
+        mode: [current, restored-msvc]
     env:
       DIAGNOSTIC_MODE: ${{ matrix.mode }}
       BAZELISK_HOME: C:/v/bazelisk
@@ -66,8 +66,32 @@ jobs:
           & ./.github/scripts/setup-voice-windows.ps1 -Target x86_64-pc-windows-msvc -SnapshotArchive $env:VOICE_CYGWIN_ARCHIVE
           if ($LASTEXITCODE -ne 0) { throw 'Voice tool provisioning failed' }
       - name: Analyze and build only the native voice SDK and runtime
+        id: native
         shell: pwsh
         run: python .github/scripts/diagnose-voice-windows.py build
+      - name: Compile and link the Bazel voice helper
+        if: ${{ !cancelled() && steps.native.outcome == 'success' }}
+        shell: pwsh
+        run: python .github/scripts/diagnose-voice-windows.py helper
+      - name: Stage and configure the native SDK for Cargo
+        id: cargo_sdk
+        if: ${{ !cancelled() && steps.native.outcome == 'success' && matrix.mode == 'current' }}
+        shell: pwsh
+        run: |
+          rustup toolchain install 1.95.0 --profile minimal
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot install the repository Rust toolchain' }
+          'CARGO_TARGET_DIR=C:/v/cargo-target' >> $env:GITHUB_ENV
+          'CARGO_BUILD_JOBS=4' >> $env:GITHUB_ENV
+          'CARGO_NET_GIT_FETCH_WITH_CLI=true' >> $env:GITHUB_ENV
+          "STABLE_GIT_COMMIT=$env:GITHUB_SHA" >> $env:GITHUB_ENV
+          python third_party/voice/cargo_ci.py stage --sdk bazel-bin/third_party/voice/native_runtime_windows_x86_64_sdk --runtime bazel-bin/third_party/voice/native_runtime_windows_x86_64 --output C:/v/cargo-voice --target x86_64-pc-windows-msvc
+          if ($LASTEXITCODE -ne 0) { throw 'Cargo SDK staging failed' }
+          python third_party/voice/cargo_ci.py configure --root C:/v/cargo-voice --target x86_64-pc-windows-msvc
+          if ($LASTEXITCODE -ne 0) { throw 'Cargo SDK configuration failed' }
+      - name: Build with Cargo and test relocated runtime loading
+        if: ${{ !cancelled() && steps.cargo_sdk.outcome == 'success' }}
+        shell: pwsh
+        run: python .github/scripts/diagnose-voice-windows.py cargo
       - name: Upload diagnostic evidence even on failure
         if: always()
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
