@@ -3,6 +3,13 @@ name: Windows voice toolchain diagnostic
 on:
   push:
     branches: [codex/voice-windows-diagnostic]
+    paths:
+      - '.github/workflows/voice-windows-diagnostic.yml'
+      - '.github/scripts/diagnose-voice-windows.py'
+      - 'third_party/voice/**'
+      - 'MODULE.bazel'
+      - '.bazelrc'
+      - 'codex-rs/**'
   workflow_dispatch:
 
 permissions:
@@ -21,6 +28,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - runner: windows-2025
+            cpu: x86_64
+            python-arch: x64
           - runner: windows-11-arm
             cpu: aarch64
             python-arch: arm64
