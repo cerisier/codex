@@ -23,10 +23,23 @@ jobs:
         with:
           target: x86_64-pc-windows-gnullvm
           cache-scope: gnullvm-diagnostic
-      - name: Prepare native Windows tools using the relocated upstream action
-        uses: ./.github/actions/setup-bazel-windows
+      - uses: ./.github/actions/setup-msvc-env
         with:
           target: x86_64-pc-windows-msvc
+      - name: Provision the public Windows inputs as in the passing voice diagnostic
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $pin = (Get-Content -Raw .github/scripts/voice-cygwin-snapshot.json | ConvertFrom-Json).archive
+          $directory = Join-Path $env:RUNNER_TEMP 'gnu-voice-cygwin'
+          New-Item -ItemType Directory -Path $directory | Out-Null
+          gh release download $pin.tag --repo openai/codex --pattern $pin.name --dir $directory
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot download pinned public build inputs' }
+          & ./.github/scripts/setup-voice-windows.ps1 -Target x86_64-pc-windows-msvc -SnapshotArchive (Join-Path $directory $pin.name)
+          if ($LASTEXITCODE -ne 0) { throw 'Voice tool provisioning failed' }
+          "VOICE_WINDOWS_SYSTEM_ROOT=$env:SystemRoot" >> $env:GITHUB_ENV
+          "VOICE_WINDOWS_HOST_ARCH=$env:PROCESSOR_ARCHITECTURE" >> $env:GITHUB_ENV
       - name: Build the GNULVM CLI and V8 host
         shell: bash
         run: |
