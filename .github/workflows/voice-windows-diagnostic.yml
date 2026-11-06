@@ -15,14 +15,22 @@ concurrency:
 jobs:
   native:
     if: github.repository == 'cerisier/codex'
-    runs-on: windows-2025
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 180
     strategy:
       fail-fast: false
       matrix:
-        mode: [current, restored-msvc]
+        include:
+          - runner: windows-2025
+            cpu: x86_64
+            python-arch: x64
+          - runner: windows-11-arm
+            cpu: aarch64
+            python-arch: arm64
     env:
-      DIAGNOSTIC_MODE: ${{ matrix.mode }}
+      DIAGNOSTIC_MODE: current
+      VOICE_CPU: ${{ matrix.cpu }}
+      VOICE_TARGET: ${{ matrix.cpu }}-pc-windows-msvc
       BAZELISK_HOME: C:/v/bazelisk
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -40,14 +48,29 @@ jobs:
       - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         with:
           python-version: '3.12'
+          architecture: ${{ matrix.python-arch }}
       - uses: meta/install-dotslash@1e4e7b3e07eaca387acb98f1d4720e0bee8dbb6a # v2
+        if: runner.arch != 'ARM64'
+      - name: Install the existing CI native ARM64 DotSlash pin
+        if: runner.arch == 'ARM64'
+        shell: bash
+        run: |
+          set -euo pipefail
+          destination="$RUNNER_TEMP/install-dotslash-arm64/bin"
+          archive="$RUNNER_TEMP/dotslash-windows-arm64.v0.5.9.tar.gz"
+          mkdir -p "$destination"
+          curl --location --silent --show-error --fail --retry 5 --retry-all-errors \
+            https://github.com/facebook/dotslash/releases/download/v0.5.9/dotslash-windows-arm64.v0.5.9.tar.gz --output "$archive"
+          echo "43d49d3472808738993ccf95a36dda8cc2869996d9a397bb02bde1e39b16146b  $archive" | sha256sum --check
+          tar xzf "$archive" -O --force-local > "$destination/dotslash.exe"
+          echo "$destination" >> "$GITHUB_PATH"
       - uses: bazel-contrib/setup-bazel@c5acdfb288317d0b5c0bbd7a396a3dc868bb0f86 # 0.19.0
         with:
           bazelisk-version: 1.30.0
           output-base: C:/v/o
       - uses: ./.github/actions/setup-msvc-env
         with:
-          target: x86_64-pc-windows-msvc
+          target: ${{ env.VOICE_TARGET }}
       - name: Select comparison configuration
         shell: pwsh
         run: python .github/scripts/diagnose-voice-windows.py configure
@@ -65,7 +88,7 @@ jobs:
       - name: Provision the existing voice recipe inputs
         shell: pwsh
         run: |
-          & ./.github/scripts/setup-voice-windows.ps1 -Target x86_64-pc-windows-msvc -SnapshotArchive $env:VOICE_CYGWIN_ARCHIVE
+          & ./.github/scripts/setup-voice-windows.ps1 -Target $env:VOICE_TARGET -SnapshotArchive $env:VOICE_CYGWIN_ARCHIVE
           if ($LASTEXITCODE -ne 0) { throw 'Voice tool provisioning failed' }
       - name: Analyze and build only the native voice SDK and runtime
         id: native
@@ -79,12 +102,12 @@ jobs:
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
-          name: voice-windows-${{ matrix.mode }}-bazel
+          name: voice-windows-${{ matrix.cpu }}-bazel
           if-no-files-found: warn
           path: voice-diagnostic/
       - name: Stage and configure the native SDK for Cargo
         id: cargo_sdk
-        if: ${{ !cancelled() && steps.native.outcome == 'success' && matrix.mode == 'current' }}
+        if: ${{ !cancelled() && steps.native.outcome == 'success' }}
         shell: pwsh
         run: |
           rustup toolchain install 1.95.0 --profile minimal
@@ -93,9 +116,10 @@ jobs:
           'CARGO_BUILD_JOBS=4' >> $env:GITHUB_ENV
           'CARGO_NET_GIT_FETCH_WITH_CLI=true' >> $env:GITHUB_ENV
           "STABLE_GIT_COMMIT=$env:GITHUB_SHA" >> $env:GITHUB_ENV
-          python third_party/voice/cargo_ci.py stage --sdk bazel-bin/third_party/voice/native_runtime_windows_x86_64_sdk --runtime bazel-bin/third_party/voice/native_runtime_windows_x86_64 --output C:/v/cargo-voice --target x86_64-pc-windows-msvc
+          $runtime = "bazel-bin/third_party/voice/native_runtime_windows_$env:VOICE_CPU"
+          python third_party/voice/cargo_ci.py stage --sdk "${runtime}_sdk" --runtime $runtime --output C:/v/cargo-voice --target $env:VOICE_TARGET
           if ($LASTEXITCODE -ne 0) { throw 'Cargo SDK staging failed' }
-          python third_party/voice/cargo_ci.py configure --root C:/v/cargo-voice --target x86_64-pc-windows-msvc
+          python third_party/voice/cargo_ci.py configure --root C:/v/cargo-voice --target $env:VOICE_TARGET
           if ($LASTEXITCODE -ne 0) { throw 'Cargo SDK configuration failed' }
       - name: Build with Cargo and test relocated runtime loading
         if: ${{ !cancelled() && steps.cargo_sdk.outcome == 'success' }}
@@ -105,7 +129,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
-          name: voice-windows-${{ matrix.mode }}
+          name: voice-windows-${{ matrix.cpu }}
           if-no-files-found: warn
           path: |
             voice-diagnostic/

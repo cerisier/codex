@@ -12,7 +12,10 @@ import sys
 REMOVAL = "10d794dee9bfb5c95c30b6b39f557cc3ee613a6b"
 EVIDENCE = Path("voice-diagnostic")
 MODE = os.environ["DIAGNOSTIC_MODE"]
-RUNTIME = "//third_party/voice:native_runtime_windows_x86_64"
+CPU = os.environ.get("VOICE_CPU", "x86_64")
+TARGET = CPU + "-pc-windows-msvc"
+RUNTIME_NAME = "native_runtime_windows_" + CPU
+RUNTIME = "//third_party/voice:" + RUNTIME_NAME
 HELPER = "//codex-rs/voice-host:codex-voice-host"
 TEST = "relocated_runtime_initializes_closes_and_rejects_duplicate_initialization"
 
@@ -85,10 +88,6 @@ def build(helper=False):
             "--repo_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=0",
             "--extra_toolchains=@local_config_cc//:cc-toolchain-x64_windows,@local_config_cc//:cc-toolchain-arm64_windows",
         ]
-    else:
-        # Diagnostic only: the root registration still names //:all, but this
-        # rules_rs revision declares the configured Rust toolchains in //rustc.
-        flags += ["--extra_toolchains=@default_rust_toolchains//rustc:all"]
     for name in ("SystemRoot", "PROCESSOR_ARCHITECTURE"):
         flags += [f"--action_env={name}={os.environ[name]}", f"--host_action_env={name}={os.environ[name]}"]
 
@@ -112,7 +111,7 @@ def build(helper=False):
         binary = Path("bazel-bin/codex-rs/voice-host/codex-voice-host.exe").resolve(strict=True)
         inspect_binary("bazel-helper", binary)
         environment = dict(os.environ)
-        runtime_bin = Path("bazel-bin/third_party/voice/native_runtime_windows_x86_64/bin").resolve(strict=True)
+        runtime_bin = (Path("bazel-bin/third_party/voice") / RUNTIME_NAME / "bin").resolve(strict=True)
         environment["PATH"] = str(runtime_bin) + os.pathsep + environment["PATH"]
         return run("bazel-helper-identity", [str(binary), "--build-commit"], env=environment)
 
@@ -133,10 +132,10 @@ def build(helper=False):
             shutil.copy2(source, EVIDENCE / (source.parent.parent.name + "-rustc.BUILD.txt"))
     outputs = Path("bazel-bin/third_party/voice")
     if outputs.exists():
-        for source in outputs.glob("native_*windows_x86_64*.json"):
+        for source in outputs.glob("native_*windows_" + CPU + "*.json"):
             shutil.copy2(source, EVIDENCE / source.name)
         for name in ("runtime.json", "sdk.json"):
-            directory = "native_runtime_windows_x86_64" + ("_sdk" if name == "sdk.json" else "")
+            directory = RUNTIME_NAME + ("_sdk" if name == "sdk.json" else "")
             source = outputs / directory / name
             if source.exists():
                 shutil.copy2(source, EVIDENCE / name)
@@ -156,7 +155,7 @@ def cargo():
     # The integration test also builds the real binary. Compile once, then use
     # that same existing test to exercise the Cargo and Bazel executables.
     command = ["cargo", "test", "--release", "--locked", "-p", "codex-voice-host",
-               "--target", "x86_64-pc-windows-msvc", "--test", "packaged_runtime",
+               "--target", TARGET, "--test", "packaged_runtime",
                "--no-run", "--message-format=json"]
     result = run("cargo-build", command, cwd="codex-rs")
     if result:
