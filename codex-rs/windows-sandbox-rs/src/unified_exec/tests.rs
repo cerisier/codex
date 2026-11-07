@@ -775,6 +775,10 @@ fn legacy_workspace_write_delete_is_limited_to_writable_roots() {
         .expect("write delete script");
 
         let env_map = HashMap::from([
+            (
+                "SystemRoot".to_string(),
+                std::env::var("SystemRoot").expect("Windows SystemRoot"),
+            ),
             ("TEMP".to_string(), temp_root.to_string_lossy().into_owned()),
             ("TMP".to_string(), tmp_root.to_string_lossy().into_owned()),
             (
